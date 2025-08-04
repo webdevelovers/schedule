@@ -1,0 +1,61 @@
+# DayOfWeek
+schedule.day.monday: Monday
+schedule.day.tuesday: Tuesday
+schedule.day.wednesday: Wednesday
+schedule.day.thursday: Thursday
+schedule.day.friday: Friday
+schedule.day.saturday: Saturday
+schedule.day.sunday: Sunday
+
+# Frequency
+schedule.frequency.none: No repetition
+schedule.frequency.daily: Daily
+schedule.frequency.weekly: Weekly
+schedule.frequency.every_two_weeks: Every two weeks
+schedule.frequency.every_three_weeks: Every three weeks
+schedule.frequency.every_four_weeks: Every four weeks
+schedule.frequency.monthly: Monthly
+schedule.frequency.every_two_months: Every two months
+schedule.frequency.every_three_months: Every three months
+schedule.frequency.every_four_months: Every four months
+schedule.frequency.every_six_months: Every six months
+schedule.frequency.yearly: Yearly
+
+# Month
+schedule.month.january: January
+schedule.month.february: February
+schedule.month.march: March
+schedule.month.april: April
+schedule.month.may: May
+schedule.month.june: June
+schedule.month.july: July
+schedule.month.august: August
+schedule.month.september: September
+schedule.month.october: October
+schedule.month.november: November
+schedule.month.december: December
+
+# Interval
+schedule.interval: '%interval%'
+schedule.interval.year: '%count% year'
+schedule.interval.years: '%count% years'
+schedule.interval.month: '%count% month'
+schedule.interval.months: '%count% months'
+schedule.interval.day: '%count% day'
+schedule.interval.days: '%count% days'
+schedule.interval.hour: '%count% hour'
+schedule.interval.hours: '%count% hours'
+schedule.interval.minute: '%count% minute'
+schedule.interval.minutes: '%count% minutes'
+
+# Schedule
+schedule.from_date: 'from %date%'
+schedule.every_day: 'every day'
+schedule.every_days: 'every %days%'
+schedule.every_month_days: 'on the %days% of every month'
+schedule.every_x: 'every %interval%'
+schedule.from_to: 'from %start% to %end%'
+schedule.from_duration: 'from %start% for %duration%'
+schedule.repeat_count: '%count% occurrences'
+schedule.until: 'until %date%'
+schedule.except: 'except %dates%'
