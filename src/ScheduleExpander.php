@@ -7,9 +7,7 @@ namespace WebDevelovers\Schedule;
 use DateInterval;
 use DateInvalidTimeZoneException;
 use DateMalformedIntervalStringException;
-use DateMalformedStringException;
 use DateTimeImmutable;
-use DateTimeInterface;
 use DateTimeZone;
 use Generator;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
@@ -25,25 +23,17 @@ readonly class ScheduleExpander
 {
     public function __construct(
         private Schedule $schedule,
-        private HolidayProviderInterface $holidaysProvider,
-        private int $maxOccurrences = 100,
+        private HolidayProviderInterface|null $holidaysProvider = null,
     ) {
     }
 
     /**
-     * @param callable|null $extraFilter Used for additional runtime filtering.
-     *
      * @return Generator<ScheduleOccurrence>
      *
-     * @throws ScheduleExpandException|DateMalformedStringException
+     * @throws ScheduleExpandException|\DateMalformedStringException
      */
-    public function expand(
-        DateTimeInterface|null $from = null,
-        DateTimeInterface|null $to = null,
-        callable|null $extraFilter = null,
-    ): Generator {
+    public function expand(): Generator {
         $schedule = $this->schedule;
-        $max = $this->maxOccurrences;
 
         try {
             $timezone = $schedule->timezone ?? new DateTimeZone(date_default_timezone_get());
@@ -58,7 +48,7 @@ readonly class ScheduleExpander
 
         $isRecurring = $schedule->isRecurring();
         if ($isRecurring === false) {
-            yield from $this->handleNonRecurring($schedule, $to, $extraFilter);
+            yield from $this->handleNonRecurring($schedule);
 
             return;
         }
@@ -76,21 +66,20 @@ readonly class ScheduleExpander
             : $start;
 
         $occurrences = 0;
-        $repeatCount = $schedule->repeatCount ?? $max;
+        $repeatCount = $schedule->repeatCount;
         try {
             $duration = $schedule->duration !== null ? new DateInterval($schedule->duration) : null;
-            $interval = new DateInterval($schedule->repeatFrequency->toISO8601());
+            $interval = new DateInterval($schedule->repeatInterval->toISO8601());
         } catch (DateMalformedIntervalStringException $e) {
             throw new ScheduleExpandException($e->getMessage(), $e->getCode(), $e);
         }
 
-        $endDate = $schedule->endDate ?? $to;
+        $endDate = $schedule->endDate;
 
-        while ($occurrences < $max && $occurrences < $repeatCount) {
-            // Exit condition: endDate is present and reached, or the $to boundary is reached, or no duration|interval are specified
+        while ($repeatCount === null || $occurrences < $repeatCount) {
+            // Exit condition: endDate is present and reached, or no duration|interval are specified
             if (
                 ($endDate !== null && $current->format('Y-m-d') > $endDate->format('Y-m-d')) ||
-                ($to && $current->format('Y-m-d') > $to->format('Y-m-d')) ||
                 $duration === null
             ) {
                 break;
@@ -142,15 +131,6 @@ readonly class ScheduleExpander
                 }
             }
 
-            // Holiday management
-            if (
-                $schedule->excludeHolidays === true &&
-                $this->holidaysProvider->isHoliday($current)
-            ) {
-                $current = $current->add($interval);
-                continue;
-            }
-
             // Exceptions management: dates specifically not to include in the occurrences.
             $isExcept = false;
             foreach ($schedule->exceptDates as $except) {
@@ -172,13 +152,8 @@ readonly class ScheduleExpander
                 clone $current,
                 $duration,
                 $timezone,
+                $this->holidaysProvider && $this->holidaysProvider->isHoliday($current)
             );
-
-            // custom callable filter, for runtime exceptions
-            if ($extraFilter !== null && ! $extraFilter($occurrence)) {
-                $current = $current->add($interval);
-                continue;
-            }
 
             yield $occurrence;
 
@@ -191,8 +166,6 @@ readonly class ScheduleExpander
     /** @throws ScheduleExpandException */
     private function handleNonRecurring(
         Schedule $schedule,
-        DateTimeInterface|null $to,
-        callable|null $extraFilter = null,
     ): Generator {
         if ($schedule->startDate === null) {
             return;
@@ -222,15 +195,8 @@ readonly class ScheduleExpander
             $start = (clone $schedule->startDate);
         }
 
-        $occurrence = new ScheduleOccurrence($start, $duration, $timezone);
+        $isHoliday = $this->holidaysProvider && $this->holidaysProvider->isHoliday($start);
 
-        if (
-            ($extraFilter && ! $extraFilter($occurrence)) ||
-            ($to && $start > $to)
-        ) {
-            return;
-        }
-
-        yield $occurrence;
+        yield new ScheduleOccurrence($start, $duration, $timezone, $isHoliday);
     }
 }

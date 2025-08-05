@@ -11,7 +11,7 @@ use Yasumi\Exception\ProviderNotFoundException;
 use Yasumi\Exception\UnknownLocaleException;
 use Yasumi\Yasumi;
 
-class SampleYasumiProvider implements HolidayProviderInterface
+readonly class SampleYasumiProvider implements HolidayProviderInterface
 {
     public function __construct(
         private string $country, // The country name. @see https://www.yasumi.dev/providers/providers.html

@@ -11,7 +11,8 @@
   ],
   "keywords" : ["event","calendar","recurring","schedule","schema.org"],
   "require": {
-    "php": ">=8.3.0"
+    "php": ">=8.3.0",
+    "cakephp/chronos": "^3.0"
   },
   "require-dev": {
     "azuyalabs/yasumi": "^2.8",

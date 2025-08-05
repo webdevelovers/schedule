@@ -2,7 +2,7 @@
 
 use WebDevelovers\Schedule\Enum\DayOfWeek;
 use WebDevelovers\Schedule\Schedule;
-use WebDevelovers\Schedule\Enum\Frequency;
+use WebDevelovers\Schedule\Enum\ScheduleInterval;
 
 /**
  * "An event taking place daily (on Mondays and Wednesday),
@@ -22,7 +22,7 @@ use WebDevelovers\Schedule\Enum\Frequency;
  */
 
 $schedule = new Schedule(
-    repeatFrequency: Frequency::DAILY,
+    repeatInterval: ScheduleInterval::DAILY,
     startDate: new \DateTime('2025-01-01', new \DateTimeZone('UTC')),
     startTime: new \DateTime('2025-01-01 09:00'),
     repeatCount: 5,

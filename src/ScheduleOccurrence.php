@@ -19,6 +19,7 @@ readonly class ScheduleOccurrence
         public DateTimeInterface $start,
         public DateInterval $duration,
         public DateTimeZone $timezone,
+        public bool $isHoliday,
     ) {
         $immutableStart = $start instanceof DateTimeImmutable
             ? $start
@@ -43,6 +44,6 @@ readonly class ScheduleOccurrence
         $startStr = $this->start->format('Y-m-d H:i');
         $endStr = $this->end->format('Y-m-d H:i');
 
-        return $startStr . ' → ' . $endStr . ' (' . $this->timezone->getName() . ')';
+        return $startStr . ' → ' . $endStr . ' (' . $this->timezone->getName() . ') - ' . ' festivo: ' . ($this->isHoliday ? 'si' : 'no');
     }
 }

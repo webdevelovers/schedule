@@ -4,24 +4,22 @@ declare(strict_types=1);
 
 namespace WebDevelovers\Schedule;
 
+use Cake\Chronos\ChronosDate;
+use Cake\Chronos\ChronosTime;
 use DateInterval;
 use DateInvalidTimeZoneException;
 use DateMalformedIntervalStringException;
-use DateTimeImmutable;
 use DateTimeInterface;
 use DateTimeZone;
-use Throwable;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
-use WebDevelovers\Schedule\Enum\Frequency;
+use WebDevelovers\Schedule\Enum\ScheduleInterval;
 use WebDevelovers\Schedule\Enum\Month;
 use WebDevelovers\Schedule\Exception\ScheduleException;
-use WebDevelovers\Schedule\Exception\ScheduleValidationException;
 
 use function array_map;
 use function array_unique;
 use function count;
 use function is_int;
-use function sprintf;
 
 /**
  * Represents an abstract schedule pattern, which can be used to describe
@@ -31,196 +29,140 @@ use function sprintf;
  *
  * Inspired by https://schema.org/Schedule
  */
-class Schedule
+readonly class Schedule
 {
     private const string DEFAULT_TIMEZONE = 'UTC';
-    public readonly DateTimeZone $timezone;
+
+    public ChronosTime|null $endTime;
+    public DateInterval|null $duration;
+    public DateTimeZone $timezone;
 
     /**
-     * @param Frequency $repeatFrequency The frequency of the occurrences (e.g., Daily/Weekly).
-     * @param DateTimeInterface|null $startDate The first day of the occurrences (inclusive, day is considered).
-     * @param DateTimeInterface|null $endDate The last day of the occurrences (inclusive, day is considered).
-     * @param DateTimeInterface|null $startTime The time when each occurrence starts (time part is considered).
-     * @param DateTimeInterface|null $endTime
-     *   The time when each occurrence ends (time part is considered).
-     *   If null and duration is provided, it will be automatically calculated.
+     * @param ScheduleInterval          $repeatInterval
+     * The interval between occurrences (e.g., Daily/Weekly).
+     * @param ChronosDate|null          $startDate
+     * The first day of the occurrences (inclusive).
+     * @param ChronosDate|null          $endDate
+     * The last day of the occurrences (inclusive).
+     * @param ChronosTime|null          $startTime
+     * The time when each occurrence starts
+     * @param ChronosTime|DateInterval|string|null $endTimeOrDuration
      * @param int|null $repeatCount The maximum number of occurrences to generate.
-     * @param string|null $duration
-     *   Duration of each occurrence, in ISO8601 format (e.g. "PT1H30M").
-     *   If null and endTime are provided, it will be inferred.
-     * @param string|null $timezone The timezone (IANA standard) for all occurrences.
      * @param DayOfWeek[] $byDay Filters by days of the week (e.g., only Mondays and Wednesdays).
      * @param int[] $byMonthDay Filters by days of the month (e.g., 1st, 15th).
      * @param Month[] $byMonth Filters by months of the year (e.g., January, June).
      * @param int[] $byMonthWeek Filters by weeks within the month (e.g., 1 = first week, -1 = last week).
      * @param DateTimeInterface[] $exceptDates
-     *   Array of excluded dates or datetimes. If only the date is set,
-     *   all events on that date will be excluded; if datetime, only the
-     *   matching event will be excluded.
+     *    Array of excluded dates or datetimes. If only the date is set,
+     *    all events on that date will be excluded; if datetime, only the
+     *    matching event will be excluded.
+     * @param string|null $timezone The timezone (IANA standard) for all occurrences.
      *
      * @throws ScheduleException
      */
     public function __construct(
-        public Frequency $repeatFrequency,
-        public DateTimeInterface|null $startDate = null,
-        public DateTimeInterface|null $endDate = null,
-        public DateTimeInterface|null $startTime = null,
-        public DateTimeInterface|null $endTime = null,
-        public int|null $repeatCount = null,
-        public string|null $duration = null,
-        public array $byDay = [],
-        public array $byMonthDay = [],
-        public array $byMonth = [],
-        public array $byMonthWeek = [],
-        public array $exceptDates = [],
-        public bool $excludeHolidays = true,
-        string|null $timezone = null,
+        public ScheduleInterval              $repeatInterval,
+        public ChronosDate|null              $startDate         = null,
+        public ChronosDate|null              $endDate           = null,
+        public ChronosTime|null              $startTime         = null,
+        ChronosTime|DateInterval|string|null $endTimeOrDuration = null,
+        public int|null                      $repeatCount       = null,
+        public array                         $byDay             = [],
+        public array                         $byMonthDay        = [],
+        public array                         $byMonth           = [],
+        public array                         $byMonthWeek       = [],
+        public array                         $exceptDates       = [],
+        string|null                          $timezone          = null,
     ) {
-        // Semantic coherence: if both startTime and duration are set but endTime is missing, compute it
-        if ($this->startTime !== null && $this->duration !== null && $this->endTime === null) {
-            try {
-                // Clone the startTime and add duration (ISO8601)
-                $base = $this->startTime instanceof DateTimeImmutable
-                    ? $this->startTime
-                    : DateTimeImmutable::createFromInterface($this->startTime);
+        $this->setTimezone($timezone);
+        $this->initEndTimeAndDuration($endTimeOrDuration);
 
-                $this->endTime = $base->add(new DateInterval($this->duration));
-            } catch (Throwable $throwable) {
-                throw new ScheduleException($throwable->getMessage(), $throwable->getCode(), $throwable);
-            }
-        }
-
-        // Likewise, if startTime and endTime are set but duration is missing, compute it
-        if ($this->startTime !== null && $this->endTime !== null && $this->duration === null) {
-            try {
-                $this->duration = $this->startTime->diff($this->endTime)->format('PT%hH%iM%sS');
-            } catch (Throwable $throwable) {
-                throw new ScheduleException($throwable->getMessage(), $throwable->getCode(), $throwable);
-            }
-        }
-
-        try {
-            $this->timezone = new DateTimeZone($timezone ?? self::DEFAULT_TIMEZONE);
-        } catch (DateInvalidTimeZoneException $e) {
-            throw new ScheduleException($e->getMessage(), $e->getCode(), $e);
-        }
+        $this->validate();
     }
 
     /**
-     * TODO: maybe all in the constructor instead of a separate validation method?
+     * Gestisce la logica di parsing per determinare endTime e duration
      *
-     * @throws ScheduleValidationException
+     * @param ChronosTime|DateInterval|string|null $endTimeOrDuration
+     * @throws ScheduleException
      */
-    public function validate(): void
+    private function initEndTimeAndDuration(
+        ChronosTime|DateInterval|string|null $endTimeOrDuration,
+    ): void
     {
-        $errors = [];
+        if($endTimeOrDuration === null) {
+            $this->endTime = null;
+            $this->duration = null;
 
-        // startDate has to be <= endDate
-        if ($this->startDate && $this->endDate && $this->startDate > $this->endDate) {
-            $errors[] = 'startDate must be before or equal to endDate.';
+            return;
         }
 
-        // startTime < endTime
-        // TODO: for now occurrences occupying multiple days(es. an event that starts at 23:00 and ends at 01:00) are unsupported.
-        if ($this->startTime && $this->endTime && $this->startTime >= $this->endTime) {
-            $errors[] = 'startTime must be before endTime. For now occurrences occupying multiple days(es. an event that starts at 23:00 and ends at 01:00) are unsupported.';
+        if ($endTimeOrDuration instanceof DateInterval) {
+            if (
+                $endTimeOrDuration->y === 0 &&
+                $endTimeOrDuration->m === 0 &&
+                $endTimeOrDuration->d === 0 &&
+                $endTimeOrDuration->h === 0 &&
+                $endTimeOrDuration->i === 0 &&
+                $endTimeOrDuration->s === 0
+            ) {
+                throw new ScheduleException('Duration interval cannot be zero.');
+            }
+
+            $this->duration = $endTimeOrDuration;
+            if ($this->startTime !== null) {
+                $startTimeAsDate = $this->startTime->toDateTimeImmutable($this->timezone);
+                $this->endTime = new ChronosTime($startTimeAsDate->add($endTimeOrDuration));
+            }
+
+            return;
         }
 
-        if ($this->repeatCount !== null && $this->repeatCount < 1) {
-            $errors[] = 'repeatCount must be a positive integer.';
+        if ($endTimeOrDuration instanceof ChronosTime) {
+            $this->endTime = $endTimeOrDuration;
+            if ($this->startTime !== null) {
+                $startTimeAsDate = $this->startTime->toDateTimeImmutable($this->timezone);
+                $endTimeAsDate = $this->endTime->toDateTimeImmutable($this->timezone);
+                //Endtime overflows in the next day
+                if($this->endTime->lessThan($this->startTime)) {
+                    $endTimeAsDate = $endTimeAsDate->add(new DateInterval('P1D'));
+                }
+                $this->duration = $endTimeAsDate->diff($startTimeAsDate);
+            }
+            return;
         }
 
-        // duration, if present, should be positive and valid
-        if ($this->duration !== null) {
+        if (is_string($endTimeOrDuration) && strlen($endTimeOrDuration) > 0) {
             try {
-                $interval = new DateInterval($this->duration);
-                $isZero = ($interval->y === 0 && $interval->m === 0 && $interval->d === 0 && $interval->h === 0 && $interval->i === 0 && $interval->s === 0);
-                if ($isZero) {
-                    $errors[] = 'duration must be a non-zero interval.';
+                $duration = new DateInterval($endTimeOrDuration);
+                if (
+                    $duration->y === 0 &&
+                    $duration->m === 0 &&
+                    $duration->d === 0 &&
+                    $duration->h === 0 &&
+                    $duration->i === 0 &&
+                    $duration->s === 0
+                ) {
+                    throw new ScheduleException('Duration interval cannot be zero.');
                 }
-            } catch (DateMalformedIntervalStringException) {
-                $errors[] = 'duration is not a valid ISO8601 interval.';
-            }
-        }
 
-        // byDay: check that all elements are instances of DayOfWeek
-        foreach ($this->byDay as $index => $dayOfWeek) {
-            if ($dayOfWeek instanceof DayOfWeek) {
-                continue;
-            }
+                $this->duration = $duration;
 
-            $errors[] = sprintf('Each "byDay" element must be a DayOfWeek enum instance. Errore all\'indice %d.', $index);
-        }
-
-        // byDay: check for duplicates
-        if (empty($errors) && count($this->byDay) > 0) {
-            $byDayValues = array_map(static fn (DayOfWeek $dayOfWeek) => $dayOfWeek->value, $this->byDay);
-            if (count(array_unique($byDayValues)) < count($byDayValues)) {
-                $errors[] = 'byDay should not contain duplicates.';
-            }
-        }
-
-        // byMonth: check that all elements are instances of Month
-        foreach ($this->byMonth as $month) {
-            if (! $month instanceof Month) {
-                $errors[] = 'Each "byMonth" element must be a Month enum instance.';
-                break;
-            }
-        }
-
-        // byMonthDay: range 1..31 or -31..-1
-        foreach ($this->byMonthDay as $dayOfMonth) {
-            if (
-                ! is_int($dayOfMonth) ||
-                $dayOfMonth === 0 ||
-                $dayOfMonth > 31 ||
-                $dayOfMonth < -31
-            ) {
-                $errors[] = 'byMonthDay must contain only integers in the range 1..31 or -31..-1.';
-                break;
-            }
-        }
-
-        // byMonthWeek: only integers, between 1 and 6 or -1 and -6, no zero
-        foreach ($this->byMonthWeek as $week) {
-            if (
-                ! is_int($week) ||
-                $week === 0 ||
-                $week < -6 ||
-                $week > 6
-            ) {
-                $errors[] = 'byMonthWeek must contain only integer values between 1..6 o -1..-6 (0 is inadmissible)';
-                break;
-            }
-        }
-
-        // exceptDates must be DateTimeInterfaces
-        foreach ($this->exceptDates as $index => $exceptDate) {
-            if (! $exceptDate instanceof DateTimeInterface) {
-                $errors[] = sprintf('Each "exceptDates" element must be an instance of DateTimeInterface. Errore all\'indice %d.', $index);
-                break;
-            }
-        }
-
-        // exceptDates must be between startDate and endDate
-        if ($this->startDate && $this->endDate) {
-            foreach ($this->exceptDates as $ex) {
-                if ($ex < $this->startDate || $ex > $this->endDate) {
-                    $errors[] = 'Some exceptDates are outside the range startDate/endDate.';
-                    break;
+                if($this->startTime !== null) {
+                    $startTimeAsDate = $this->startTime->toDateTimeImmutable($this->timezone);
+                    $endTimeAsDate = $startTimeAsDate->add($this->duration);
+                    $this->endTime = new ChronosTime($endTimeAsDate);
                 }
+            } catch (DateMalformedIntervalStringException $e) {
+                throw new ScheduleException("Duration as a string should be in ISO8601 format: " . $endTimeOrDuration, 0, $e);
             }
-        }
-
-        if ($errors) {
-            throw new ScheduleValidationException($errors);
         }
     }
 
     /** Returns true if the schedule is recurring (i.e., has a repeat frequency which is not "NONE"). */
     public function isRecurring(): bool
     {
-        return $this->repeatFrequency !== Frequency::NONE;
+        return $this->repeatInterval !== ScheduleInterval::NONE;
     }
 
     /** @return array<string,array<int|string>|string|int|null> */
@@ -231,8 +173,8 @@ class Schedule
             'endDate' => $this->endDate?->format(DateTimeInterface::ATOM),
             'startTime' => $this->startTime?->format('H:i:s'),
             'endTime' => $this->endTime?->format('H:i:s'),
-            'duration' => $this->duration,
-            'repeatFrequency' => $this->repeatFrequency->value,
+            'duration' => $this->duration?->format('P%yY%mM%dDT%hH%iM%sS'),
+            'repeatFrequency' => $this->repeatInterval->value,
             'repeatCount' => $this->repeatCount,
             'timezone' => $this->timezone->getName(),
             'byDay' => $this->byDay ? array_map(static fn (DayOfWeek $d) => $d->value, $this->byDay) : null,
@@ -244,5 +186,166 @@ class Schedule
                 $this->exceptDates,
             ),
         ];
+    }
+
+    /** @throws ScheduleException */
+    private function setTimezone(string|null $timezone): void
+    {
+        try {
+            $this->timezone = new DateTimeZone($timezone ?? self::DEFAULT_TIMEZONE);
+        } catch (DateInvalidTimeZoneException $e) {
+            throw new ScheduleException($e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    /** @throws ScheduleException */
+    public function withStartDate(DateTimeInterface $startDate): self
+    {
+        return new self(
+            $this->repeatInterval,
+            $startDate,
+            $this->endDate,
+            $this->startTime,
+            $this->endTime,
+            $this->repeatCount,
+            $this->byDay,
+            $this->byMonthDay,
+            $this->byMonth,
+            $this->byMonthWeek,
+            $this->exceptDates,
+            $this->timezone->getName(),
+        );
+    }
+
+    /** @throws ScheduleException */
+    public function withEndDate(DateTimeInterface $endDate): self
+    {
+        return new self(
+            $this->repeatInterval,
+            $this->startDate,
+            $endDate,
+            $this->startTime,
+            $this->endTime,
+            $this->repeatCount,
+            $this->duration,
+            $this->byDay,
+            $this->byMonthDay,
+            $this->byMonth,
+            $this->byMonthWeek,
+            $this->exceptDates,
+            $this->timezone->getName(),
+        );
+    }
+
+    /** @throws ScheduleException */
+    public function validate(): void
+    {
+        $this->validateStartAndEndDate();
+        $this->validateStartAndEndTime();
+        $this->validateRepeatCount();
+        $this->validateByDay();
+        $this->validateByMonth();
+        $this->validateByMonthDay();
+        $this->validateByMonthWeek();
+        $this->validateExceptDates();
+    }
+
+    /** @throws ScheduleException */
+    private function validateStartAndEndDate(): void
+    {
+        if ($this->startDate && $this->endDate && $this->endDate->lessThan($this->startDate)) {
+            throw new ScheduleException('startDate must be before or equal to endDate.');
+        }
+    }
+
+    private function validateStartAndEndTime(): void
+    {
+        //TODO: support start/endTime the overflow in the next day...but how?
+    }
+
+    /** @throws ScheduleException */
+    private function validateRepeatCount(): void
+    {
+        if ($this->repeatCount !== null && $this->repeatCount < 1) {
+            throw new ScheduleException('repeatCount must be a positive integer.');
+        }
+    }
+
+    /** @throws ScheduleException */
+    private function validateByDay(): void
+    {
+        foreach ($this->byDay as $index => $dayOfWeek) {
+            if ($dayOfWeek instanceof DayOfWeek) {
+                continue;
+            }
+
+            throw new ScheduleException('Each "byDay" element must be a DayOfWeek enum instance.');
+        }
+
+        // byDay: check for duplicates
+        if (empty($errors) && count($this->byDay) > 0) {
+            $byDayValues = array_map(static fn (DayOfWeek $dayOfWeek) => $dayOfWeek->value, $this->byDay);
+            if (count(array_unique($byDayValues)) < count($byDayValues)) {
+                throw new ScheduleException('byDay should not contain duplicates.');
+            }
+        }
+    }
+
+    /** @throws ScheduleException */
+    private function validateByMonth(): void
+    {
+        foreach ($this->byMonth as $month) {
+            if (! $month instanceof Month) {
+                throw new ScheduleException('Each "byMonth" element must be a Month enum instance.');
+            }
+        }
+    }
+
+    /** @throws ScheduleException */
+    private function validateByMonthDay(): void
+    {
+        foreach ($this->byMonthDay as $dayOfMonth) {
+            if (
+                ! is_int($dayOfMonth) ||
+                $dayOfMonth === 0 ||
+                $dayOfMonth > 31 ||
+                $dayOfMonth < -31
+            ) {
+                throw new ScheduleException('byMonthDay must contain only integers in the range 1..31 or -31..-1.');
+            }
+        }
+    }
+
+    /** @throws ScheduleException */
+    private function validateByMonthWeek(): void
+    {
+        foreach ($this->byMonthWeek as $week) {
+            if (
+                ! is_int($week) ||
+                $week === 0 ||
+                $week < -6 ||
+                $week > 6
+            ) {
+                throw new ScheduleException('byMonthWeek must contain only integer values between 1..6 o -1..-6 (0 is inadmissible)');
+            }
+        }
+    }
+
+    /** @throws ScheduleException */
+    private function validateExceptDates(): void
+    {
+        foreach ($this->exceptDates as $index => $exceptDate) {
+            if (! $exceptDate instanceof DateTimeInterface) {
+                throw new ScheduleException('Each "exceptDates" element must be an instance of DateTimeInterface.');
+            }
+        }
+
+        if ($this->startDate && $this->endDate) {
+            foreach ($this->exceptDates as $ex) {
+                if ($ex < $this->startDate || $ex > $this->endDate) {
+                    throw new ScheduleException('Some exceptDates are outside the range startDate/endDate.');
+                }
+            }
+        }
     }
 }

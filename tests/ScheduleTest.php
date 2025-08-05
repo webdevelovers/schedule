@@ -2,273 +2,260 @@
 
 namespace WebDevelovers\Schedule\Tests;
 
+use Cake\Chronos\ChronosDate;
+use Cake\Chronos\ChronosTime;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
-use WebDevelovers\Schedule\Enum\Frequency;
 use WebDevelovers\Schedule\Enum\Month;
+use WebDevelovers\Schedule\Enum\ScheduleInterval;
 use WebDevelovers\Schedule\Exception\ScheduleException;
-use WebDevelovers\Schedule\Exception\ScheduleValidationException;
 use WebDevelovers\Schedule\Schedule;
 
 class ScheduleTest extends TestCase
 {
     public function testSimpleConstruction()
     {
-        $schedule = new Schedule(Frequency::DAILY);
-        $this->assertEquals(Frequency::DAILY, $schedule->repeatFrequency);
+        $schedule = new Schedule(ScheduleInterval::DAILY);
+        $this->assertEquals(ScheduleInterval::DAILY, $schedule->repeatInterval);
     }
 
+    /** @throws ScheduleException */
     public function testValidScheduleDoesNotThrow()
     {
-        $schedule = new Schedule(
-            Frequency::WEEKLY,
-            new DateTimeImmutable('2024-07-10'),
-            new DateTimeImmutable('2024-08-10'),
-            new DateTimeImmutable('2024-07-10 09:00'),
-            new DateTimeImmutable('2024-07-10 10:00'),
-            2,
-            null,
-            [DayOfWeek::MONDAY, DayOfWeek::TUESDAY],
-            [1, 15],
-            [],
-            [-1]
+        new Schedule(
+            repeatInterval: ScheduleInterval::EVERY_WEEK,
+            startDate: new ChronosDate('2024-07-10'),
+            endDate: new ChronosDate('2024-08-10'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: new ChronosTime('10:00'),
+            repeatCount: 2,
+            byDay: [DayOfWeek::MONDAY, DayOfWeek::TUESDAY],
+            byMonthDay: [1, 15],
+            byMonth: [Month::AUGUST],
+            byMonthWeek: [-1],
+            exceptDates: [new \DateTimeImmutable('2024-07-15')],
+            timezone: 'Europe/Rome'
         );
+
         $this->expectNotToPerformAssertions();
-        $schedule->validate();
     }
 
-    public function testStartDateBeforeEndDate()
+    /** @throws ScheduleException */
+    public function testEndDateBeforeStartDate()
     {
-        $this->expectException(ScheduleValidationException::class);
-        $schedule = new Schedule(
-            Frequency::DAILY,
-            new DateTimeImmutable('2024-07-10'),
-            new DateTimeImmutable('2024-07-09')
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-07-10'),
+            endDate: new ChronosDate('2024-07-09'),
         );
-        $schedule->validate();
     }
 
-    public function testStartTimeBeforeEndTime()
+    /** @throws ScheduleException */
+    public function testDurationIsCalculatedWithStartTimeEndTimeAsChronosTime()
     {
-        $this->expectException(ScheduleValidationException::class);
+        $startTime = new ChronosTime('09:00');
+        $endTime = new ChronosTime('11:30');
+
         $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            new DateTimeImmutable('2024-07-10 15:00'),
-            new DateTimeImmutable('2024-07-10 14:00')
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: null,
+            endDate: null,
+            startTime: $startTime,
+            endTimeOrDuration: $endTime
         );
-        $schedule->validate();
+
+        $this->assertEquals('PT02H30M00S', $schedule->duration->format('PT%HH%IM%SS'));;
     }
 
-    public function testDurationIsCalculatedFromStartAndEndTime()
+    /** @throws ScheduleException */
+    public function testDurationIsCalculatedWithStartTimeEndTimeAsInterval()
     {
-        $startTime = new \DateTimeImmutable('2024-07-10 09:00');
-        $endTime = new \DateTimeImmutable('2024-07-10 11:30');
+        $startTime = new ChronosTime('09:00');
+        $endTime = new \DateInterval('PT2H30M');
+
         $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            $startTime,
-            $endTime
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: null,
+            endDate: null,
+            startTime: $startTime,
+            endTimeOrDuration: $endTime
         );
 
-        // Deve calcolare automaticamente la durata: 2 ore e 30 minuti
-        $this->assertEquals('PT2H30M0S', $schedule->duration);
+        $this->assertEquals('PT02H30M00S', $schedule->duration->format('PT%HH%IM%SS'));;
     }
 
-    public function testEndTimeIsCalculatedFromStartTimeAndDuration()
+    /** @throws ScheduleException */
+    public function testDurationIsCalculatedWithStartTimeEndTimeAsString()
     {
-        $startTime = new \DateTimeImmutable('2024-07-10 09:00');
-        $duration = 'PT1H45M';
+        $startTime = new ChronosTime('09:00');
+        $endTime = 'PT2H30M';
+
         $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            $startTime,
-            null,
-            null,
-            $duration
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: null,
+            endDate: null,
+            startTime: $startTime,
+            endTimeOrDuration: $endTime
         );
 
-        // Deve calcolare automaticamente endTime = 10:45
-        $this->assertInstanceOf(\DateTimeImmutable::class, $schedule->endTime);
-        $this->assertEquals('2024-07-10 10:45', $schedule->endTime->format('Y-m-d H:i'));
+        $this->assertEquals('PT02H30M00S', $schedule->duration->format('PT%HH%IM%SS'));;
+    }
+
+    /** @throws ScheduleException */
+    public function testDurationIsNotCalculatedWithoutEndTime()
+    {
+        $startTime = new ChronosTime('09:00');
+
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: null,
+            endDate: null,
+            startTime: $startTime,
+        );
+
+        $this->assertEquals(null, $schedule->duration);;
+    }
+
+    public function testRepeatCountZero()
+    {
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            repeatCount: 0
+        );
     }
 
     public function testRepeatCountNegative()
     {
-        $this->expectException(ScheduleValidationException::class);
-        $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            null,
-            null,
-            0 // Not valid: must be >= 1
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            repeatCount: -5
         );
-        $schedule->validate();
     }
 
     public function testInvalidDurationString()
     {
-        $this->expectException(ScheduleValidationException::class);
+        $this->expectException(ScheduleException::class);
         $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            null,
-            null,
-            null,
-            'XXX' // Not a valid ISO8601 interval
+            repeatInterval: ScheduleInterval::DAILY,
+            endTimeOrDuration: 'XXX',
         );
         $schedule->validate();
     }
 
     public function testZeroDuration()
     {
-        $this->expectException(ScheduleValidationException::class);
-        $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            null,
-            null,
-            null,
-            'PT0S'
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            ScheduleInterval::DAILY,
+            endTimeOrDuration: 'PT0S'
         );
-        $schedule->validate();
     }
 
     public function testByDayDuplicate()
     {
-        $this->expectException(ScheduleValidationException::class);
+        $this->expectException(ScheduleException::class);
         $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            [DayOfWeek::MONDAY, DayOfWeek::MONDAY]
+            repeatInterval: ScheduleInterval::DAILY,
+            byDay: [DayOfWeek::MONDAY, DayOfWeek::MONDAY]
         );
         $schedule->validate();
     }
 
-    /** @throws ScheduleException */
     public function testByDayInvalidType()
     {
-        $this->expectException(ScheduleValidationException::class);
-        $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            [1, 2]
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            byDay: [1,2]
         );
-        $schedule->validate();
     }
 
-    /** @throws ScheduleException */
     public function testByMonthInvalidType()
     {
-        $this->expectException(ScheduleValidationException::class);
-        $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            [],
-            [],
-            [1, 2]
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            byMonth: [1,2]
         );
-        $schedule->validate();
     }
 
-    /** @throws ScheduleException */
     public function testByMonthDayOutOfRange()
     {
-        $this->expectException(ScheduleValidationException::class);
-        $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            [],
-            [32]
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            byMonthDay: [32]
         );
-        $schedule->validate();
     }
 
-    /** @throws ScheduleException */
+    public function testZeroByMonthDay()
+    {
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            byMonthDay: [0]
+        );
+    }
+
     public function testByMonthWeekOutOfRange()
     {
-        $this->expectException(ScheduleValidationException::class);
-        $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            [],
-            [],
-            [],
-            [7]
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            byMonthWeek: [7]
         );
-        $schedule->validate();
     }
 
-    /** @throws ScheduleException */
+    public function testByMonthWeekNegativeOutOfRange()
+    {
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            byMonthWeek: [-7]
+        );
+    }
+
+    public function testByMonthWeekZero()
+    {
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            byMonthWeek: [0]
+        );
+    }
+
     public function testInvalidExceptDateType()
     {
-        $this->expectException(ScheduleValidationException::class);
-        $schedule = new Schedule(
-            Frequency::DAILY,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            [],
-            [],
-            [],
-            [],
-            [42] // not a DateTimeInterface
+        $this->expectException(ScheduleException::class);
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            exceptDates: [1],
         );
-        $schedule->validate();
     }
 
     /** @throws ScheduleException */
     public function testAsArraySerialization()
     {
-        $start = new DateTimeImmutable('2024-08-01');
-        $end = new DateTimeImmutable('2024-08-31');
-        $startTime = (new DateTimeImmutable('2024-08-01 09:00'))->setDate(2000, 1, 1); // Solo orario per startTime
-        $endTime = (new DateTimeImmutable('2024-08-01 11:00'))->setDate(2000, 1, 1);   // Solo orario per endTime
-        $except = [new DateTimeImmutable('2024-08-15'), new DateTimeImmutable('2024-08-18T09:00:00+02:00')];
+        $start = new ChronosDate('2024-08-01');
+        $end = new ChronosDate('2024-08-31');
+        $startTime = new ChronosTime('09:00');
+        $endTime = new ChronosTime('11:00');
+        $except = [
+            new DateTimeImmutable('2024-08-15'),
+            new DateTimeImmutable('2024-08-18T09:00:00+02:00')
+        ];
 
         $schedule = new Schedule(
-            repeatFrequency: Frequency::DAILY,
+            repeatInterval: ScheduleInterval::DAILY,
             startDate: $start,
             endDate: $end,
             startTime: $startTime,
-            endTime: $endTime,
+            endTimeOrDuration: $endTime,
             repeatCount: 10,
-            duration: 'PT2H',
             byDay: [DayOfWeek::MONDAY],
             byMonthDay: [1, 15],
             byMonth: [Month::AUGUST],
@@ -284,8 +271,8 @@ class ScheduleTest extends TestCase
         $this->assertSame('2024-08-31T00:00:00+00:00', $array['endDate']);
         $this->assertSame('09:00:00', $array['startTime']);
         $this->assertSame('11:00:00', $array['endTime']);
-        $this->assertSame('PT2H', $array['duration']);
-        $this->assertSame(Frequency::DAILY->value, $array['repeatFrequency']);
+        $this->assertSame('P0Y0M0DT2H0M0S', $array['duration']);
+        $this->assertSame(ScheduleInterval::DAILY->value, $array['repeatFrequency']);
         $this->assertSame(10, $array['repeatCount']);
         $this->assertSame('Europe/Rome', $array['timezone']);
         $this->assertEquals([DayOfWeek::MONDAY->value], $array['byDay']);
