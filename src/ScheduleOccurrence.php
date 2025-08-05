@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WebDevelovers\Schedule;
 
 use DateInterval;
+use DateTimeImmutable;
 use DateTimeInterface;
 use DateTimeZone;
 
@@ -19,9 +20,9 @@ readonly class ScheduleOccurrence
         public DateInterval $duration,
         public DateTimeZone $timezone,
     ) {
-        $immutableStart = $start instanceof \DateTimeImmutable
+        $immutableStart = $start instanceof DateTimeImmutable
             ? $start
-            : \DateTimeImmutable::createFromInterface($start);
+            : DateTimeImmutable::createFromInterface($start);
 
         $this->end = $immutableStart->add($duration);
     }

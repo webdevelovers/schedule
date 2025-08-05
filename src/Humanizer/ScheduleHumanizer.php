@@ -69,39 +69,39 @@ readonly class ScheduleHumanizer
 
     private function humanizeFrequency(): string
     {
-        $s = $this->schedule;
-        $t = $this->translator;
+        $schedule = $this->schedule;
+        $translator = $this->translator;
 
-        if ($s->repeatFrequency === Frequency::NONE) {
+        if ($schedule->repeatFrequency === Frequency::NONE) {
             return $this->translator->trans('frequency.none', domain: 'schedule', locale: $this->locale);
         }
 
-        if ($s->repeatFrequency->equals(Frequency::DAILY)) {
-            if ($s->byDay && count($s->byDay) > 0) {
-                return $t->trans('schedule.every_days', [
-                    '%days%' => $this->humanizeDays($s->byDay),
+        if ($schedule->repeatFrequency->equals(Frequency::DAILY)) {
+            if ($schedule->byDay && count($schedule->byDay) > 0) {
+                return $translator->trans('schedule.every_days', [
+                    '%days%' => $this->humanizeDays($schedule->byDay),
                 ], domain: 'schedule', locale: $this->locale);
             }
 
-            return $t->trans('schedule.every_day', [], domain: 'schedule', locale: $this->locale);
+            return $translator->trans('schedule.every_day', [], domain: 'schedule', locale: $this->locale);
         }
 
-        if ($s->repeatFrequency->equals(Frequency::WEEKLY) && $s->byDay && count($s->byDay) > 0) {
-            return $t->trans('schedule.every_days', [
-                '%days%' => $this->humanizeDays($s->byDay),
+        if ($schedule->repeatFrequency->equals(Frequency::WEEKLY) && $schedule->byDay && count($schedule->byDay) > 0) {
+            return $translator->trans('schedule.every_days', [
+                '%days%' => $this->humanizeDays($schedule->byDay),
             ], domain: 'schedule', locale: $this->locale);
         }
 
-        if ($s->repeatFrequency->equals(Frequency::MONTHLY)) {
-            if ($s->byMonthDay && count($s->byMonthDay) > 0) {
-                return $t->trans('schedule.every_month_days', [
-                    '%days%' => implode(', ', $s->byMonthDay),
+        if ($schedule->repeatFrequency->equals(Frequency::MONTHLY)) {
+            if ($schedule->byMonthDay && count($schedule->byMonthDay) > 0) {
+                return $translator->trans('schedule.every_month_days', [
+                    '%days%' => implode(', ', $schedule->byMonthDay),
                 ], domain: 'schedule', locale: $this->locale);
             }
 
-            if ($s->byMonthWeek && count($s->byMonthWeek) > 0 && $s->byDay && count($s->byDay) > 0) {
+            if ($schedule->byMonthWeek && count($schedule->byMonthWeek) > 0 && $schedule->byDay && count($schedule->byDay) > 0) {
                 $settimane = [];
-                foreach ($s->byMonthWeek as $week) {
+                foreach ($schedule->byMonthWeek as $week) {
                     $wk = match ($week) {
                         1 => 'primo',
                         2 => 'secondo',
@@ -116,23 +116,23 @@ readonly class ScheduleHumanizer
                 $descSettimane = implode(' e ', $settimane);
 
                 return sprintf(
-                    'ogni %s %s del mese',
+                    'ogni %schedule %schedule del mese',
                     $descSettimane,
-                    $this->humanizeDays($s->byDay),
+                    $this->humanizeDays($schedule->byDay),
                 );
             }
         }
 
-        if ($s->byMonth && count($s->byMonth) > 0) {
-            $mesi = array_map(static fn (Month $m) => strtolower($m->name), $s->byMonth);
+        if ($schedule->byMonth && count($schedule->byMonth) > 0) {
+            $mesi = array_map(static fn (Month $m) => strtolower($m->name), $schedule->byMonth);
 
-            return $t->trans('schedule.every_x', [
+            return $translator->trans('schedule.every_x', [
                 '%interval%' => implode(', ', $mesi),
             ], domain: 'schedule', locale: $this->locale);
         }
 
-        return $t->trans('schedule.every_x', [
-            '%interval%' => $this->humanizeInterval($s->repeatFrequency),
+        return $translator->trans('schedule.every_x', [
+            '%interval%' => $this->humanizeInterval($schedule->repeatFrequency),
         ], domain: 'schedule', locale: $this->locale);
     }
 

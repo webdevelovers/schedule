@@ -7,14 +7,16 @@ namespace WebDevelovers\Schedule;
 use DateInterval;
 use DateInvalidTimeZoneException;
 use DateMalformedIntervalStringException;
+use DateMalformedStringException;
+use DateTimeImmutable;
 use DateTimeInterface;
 use DateTimeZone;
 use Generator;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
+use WebDevelovers\Schedule\Enum\Month;
 use WebDevelovers\Schedule\Exception\ScheduleExpandException;
 use WebDevelovers\Schedule\Holiday\HolidayProviderInterface;
 
-use function array_map;
 use function ceil;
 use function date_default_timezone_get;
 use function in_array;
@@ -33,56 +35,56 @@ readonly class ScheduleExpander
      *
      * @return Generator<ScheduleOccurrence>
      *
-     * @throws ScheduleExpandException
+     * @throws ScheduleExpandException|DateMalformedStringException
      */
     public function expand(
         DateTimeInterface|null $from = null,
         DateTimeInterface|null $to = null,
         callable|null $extraFilter = null,
     ): Generator {
-        $s = $this->schedule;
+        $schedule = $this->schedule;
         $max = $this->maxOccurrences;
 
         try {
-            $tz = $s->timezone ?? $from?->getTimezone() ?? new DateTimeZone(date_default_timezone_get());
-        } catch (DateInvalidTimeZoneException $e) {
-            throw new ScheduleExpandException($e->getMessage(), $e->getCode(), $e);
+            $timezone = $schedule->timezone ?? new DateTimeZone(date_default_timezone_get());
+        } catch (DateInvalidTimeZoneException $exception) {
+            throw new ScheduleExpandException($exception->getMessage(), $exception->getCode(), $exception);
         }
 
-        $start = $s->startDate;
+        $start = $schedule->startDate;
         if (! $start) {
             return;
         }
 
-        $isRecurring = $s->isRecurring();
+        $isRecurring = $schedule->isRecurring();
         if ($isRecurring === false) {
-            yield from $this->handleNonRecurring($s, $to, $extraFilter);
+            yield from $this->handleNonRecurring($schedule, $to, $extraFilter);
 
             return;
         }
 
-        $current = $s->startTime
-            ? ($s->startTime instanceof \DateTimeImmutable
-                ? $s->startTime
-                : \DateTimeImmutable::createFromInterface($s->startTime)
+        $current = $schedule->startTime
+            ? ($schedule->startTime instanceof DateTimeImmutable
+                ? $schedule->startTime
+                : DateTimeImmutable::createFromInterface($schedule->startTime)
             )
                 ->setDate(
                     (int) $start->format('Y'),
                     (int) $start->format('m'),
-                    (int) $start->format('d')
+                    (int) $start->format('d'),
                 )
             : $start;
 
         $occurrences = 0;
-        $repeatCount = $s->repeatCount ?? $max;
+        $repeatCount = $schedule->repeatCount ?? $max;
         try {
-            $duration = $s->duration !== null ? new DateInterval($s->duration) : null;
-            $interval = new DateInterval($s->repeatFrequency->toISO8601());
+            $duration = $schedule->duration !== null ? new DateInterval($schedule->duration) : null;
+            $interval = new DateInterval($schedule->repeatFrequency->toISO8601());
         } catch (DateMalformedIntervalStringException $e) {
             throw new ScheduleExpandException($e->getMessage(), $e->getCode(), $e);
         }
 
-        $endDate = $s->endDate ?? $to;
+        $endDate = $schedule->endDate ?? $to;
 
         while ($occurrences < $max && $occurrences < $repeatCount) {
             // Exit condition: endDate is present and reached, or the $to boundary is reached, or no duration|interval are specified
@@ -95,31 +97,44 @@ readonly class ScheduleExpander
             }
 
             // byDay filter
-            if (! empty($s->byDay) && ! in_array(DayOfWeek::fromDateTime($current), $s->byDay)) {
+            if (
+                ! empty($schedule->byDay) &&
+                ! in_array(DayOfWeek::fromDateTime($current), $schedule->byDay)
+            ) {
                 $current = $current->add($interval);
                 continue;
             }
 
             // byMonth filter
-            if (! empty($s->byMonth) && ! in_array((int) $current->format('n'), array_map(static fn ($m) => $m->value, $s->byMonth))) {
+            if (
+                ! empty($schedule->byMonth) &&
+                ! in_array(
+                    Month::fromNumber((int) $current->format('n')),
+                    $schedule->byMonth,
+                    true,
+                )
+            ) {
                 $current = $current->add($interval);
                 continue;
             }
 
             // byMonthDay filter
-            if (! empty($s->byMonthDay) && ! in_array((int) $current->format('j'), $s->byMonthDay)) {
+            if (
+                ! empty($schedule->byMonthDay) &&
+                ! in_array((int) $current->format('j'), $schedule->byMonthDay)
+            ) {
                 $current = $current->add($interval);
                 continue;
             }
 
             // byMonthWeek filter
-            if (! empty($s->byMonthWeek)) {
+            if (! empty($schedule->byMonthWeek)) {
                 $weekOfMonth = (int) ceil($current->format('j') / 7);
                 $lastDayOfMonth = (clone $current)->modify('last day of this month');
                 $weeksInMonth = (int) ceil($lastDayOfMonth->format('j') / 7);
                 $negativeWeek = $weekOfMonth - ($weeksInMonth + 1);
 
-                $allowedWeeks = $s->byMonthWeek;
+                $allowedWeeks = $schedule->byMonthWeek;
 
                 if (! in_array($weekOfMonth, $allowedWeeks, true) && ! in_array($negativeWeek, $allowedWeeks, true)) {
                     $current = $current->add($interval);
@@ -128,14 +143,17 @@ readonly class ScheduleExpander
             }
 
             // Holiday management
-            if ($s->excludeHolidays === true && $this->holidaysProvider->isHoliday($current)) {
+            if (
+                $schedule->excludeHolidays === true &&
+                $this->holidaysProvider->isHoliday($current)
+            ) {
                 $current = $current->add($interval);
                 continue;
             }
 
             // Exceptions management: dates specifically not to include in the occurrences.
             $isExcept = false;
-            foreach ($s->exceptDates as $except) {
+            foreach ($schedule->exceptDates as $except) {
                 if (
                     $except->format('Y-m-d H:i') === $current->format('Y-m-d H:i') ||
                     $except->format('Y-m-d') === $current->format('Y-m-d')
@@ -153,7 +171,7 @@ readonly class ScheduleExpander
             $occurrence = new ScheduleOccurrence(
                 clone $current,
                 $duration,
-                $tz,
+                $timezone,
             );
 
             // custom callable filter, for runtime exceptions
@@ -172,39 +190,39 @@ readonly class ScheduleExpander
 
     /** @throws ScheduleExpandException */
     private function handleNonRecurring(
-        Schedule $s,
+        Schedule $schedule,
         DateTimeInterface|null $to,
         callable|null $extraFilter = null,
     ): Generator {
-        if ($s->startDate === null) {
+        if ($schedule->startDate === null) {
             return;
         }
 
         try {
-            $duration = $s->duration !== null ? new DateInterval($s->duration) : null;
+            $duration = $schedule->duration !== null ? new DateInterval($schedule->duration) : null;
             if ($duration === null) {
                 return;
             }
 
-            $tz = $s->timezone ?? new DateTimeZone(date_default_timezone_get());
+            $timezone = $schedule->timezone ?? new DateTimeZone(date_default_timezone_get());
         } catch (DateMalformedIntervalStringException | DateInvalidTimeZoneException $e) {
             throw new ScheduleExpandException($e->getMessage(), $e->getCode(), $e);
         }
 
-        if ($s->startTime) {
-            $start = ($s->startTime instanceof \DateTimeImmutable
-                ? $s->startTime
-                : \DateTimeImmutable::createFromInterface($s->startTime)
+        if ($schedule->startTime) {
+            $start = ($schedule->startTime instanceof DateTimeImmutable
+                ? $schedule->startTime
+                : DateTimeImmutable::createFromInterface($schedule->startTime)
             )->setDate(
-                (int) $s->startDate->format('Y'),
-                (int) $s->startDate->format('m'),
-                (int) $s->startDate->format('d')
+                (int) $schedule->startDate->format('Y'),
+                (int) $schedule->startDate->format('m'),
+                (int) $schedule->startDate->format('d'),
             );
         } else {
-            $start = (clone $s->startDate);
+            $start = (clone $schedule->startDate);
         }
 
-        $occurrence = new ScheduleOccurrence($start, $duration, $tz);
+        $occurrence = new ScheduleOccurrence($start, $duration, $timezone);
 
         if (
             ($extraFilter && ! $extraFilter($occurrence)) ||

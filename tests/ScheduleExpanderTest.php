@@ -2,6 +2,7 @@
 
 namespace WebDevelovers\Schedule\Tests;
 
+use DateTimeImmutable;
 use Exception;
 use PHPUnit\Framework\TestCase;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
@@ -20,7 +21,7 @@ final class ScheduleExpanderTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tz = 'Europe/Rome';
+        $this->tz = 'UTC';
         $this->holidaysProvider = $this->createMock(HolidayProviderInterface::class);
         $this->holidaysProvider
             ->method('isHoliday')
@@ -48,6 +49,11 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2024-01-03 09:00', $occurrences[2]->start->format('Y-m-d H:i'));
     }
 
+    /**
+     * @throws \DateMalformedStringException
+     * @throws ScheduleExpandException
+     * @throws ScheduleException
+     */
     public function testEndDateIncludedInOccurrences(): void
     {
         $schedule = new Schedule(
@@ -166,7 +172,7 @@ final class ScheduleExpanderTest extends TestCase
     {
         $schedule = new Schedule(
             repeatFrequency: Frequency::DAILY,
-            startDate: new \DateTimeImmutable('2024-01-01'),
+            startDate: new DateTimeImmutable('2024-01-01'),
             duration: 'PT1H',
             byDay: [DayOfWeek::FRIDAY], // Solo ultima settimana di ciascun mese
             byMonthWeek: [-1], // Solo venerdì per esempio
@@ -176,8 +182,8 @@ final class ScheduleExpanderTest extends TestCase
 
         // Espandiamo per 3 mesi
         $occurrences = iterator_to_array($expander->expand(
-            new \DateTimeImmutable('2024-01-01'),
-            new \DateTimeImmutable('2024-03-31')
+            new DateTimeImmutable('2024-01-01'),
+            new DateTimeImmutable('2024-03-31')
         ));
 
         // Controlliamo che tutte le date siano davvero i venerdì dell'ultima settimana del mese
@@ -205,7 +211,7 @@ final class ScheduleExpanderTest extends TestCase
     {
         $schedule = new Schedule(
             repeatFrequency: Frequency::DAILY,
-            startDate: new \DateTimeImmutable('2024-01-01'),
+            startDate: new DateTimeImmutable('2024-01-01'),
             duration: 'PT1H',
             byDay: [DayOfWeek::MONDAY], // Penultima settimana
             byMonthWeek: [-2], // Solo lunedì
@@ -214,8 +220,8 @@ final class ScheduleExpanderTest extends TestCase
         $expander = new ScheduleExpander($schedule, new SampleYasumiProvider('Italy'));
 
         $occurrences = iterator_to_array($expander->expand(
-            new \DateTimeImmutable('2024-01-01'),
-            new \DateTimeImmutable('2024-03-31')
+            new DateTimeImmutable('2024-01-01'),
+            new DateTimeImmutable('2024-03-31')
         ));
 
         $this->assertNotEmpty($occurrences);
@@ -231,6 +237,153 @@ final class ScheduleExpanderTest extends TestCase
             $negativeWeek = $weekOfMonth - ($weeksInMonth + 1);
             $this->assertSame(-2, $negativeWeek, $date->format('Y-m-d')." non è nella penultima settimana del mese");
         }
+    }
+
+    /**
+     * @throws \DateMalformedStringException
+     * @throws ScheduleExpandException
+     * @throws ScheduleException
+     */
+    public function testSkipHolidayOccurrences(): void
+    {
+        $holidayProvider = $this->createMock(HolidayProviderInterface::class);
+        $holidayProvider
+            ->method('isHoliday')
+            ->willReturnCallback(fn(\DateTimeInterface $date) => $date->format('Y-m-d') === '2024-01-01');
+
+        $schedule = new Schedule(
+            repeatFrequency: Frequency::DAILY,
+            startDate: new DateTimeImmutable('2024-01-01'),
+            startTime: new DateTimeImmutable('2024-01-01 09:00'),
+            repeatCount: 3,
+            duration: 'PT1H',
+            timezone: $this->tz
+        );
+
+        $expander = new ScheduleExpander($schedule, $holidayProvider);
+        $occurrences = iterator_to_array($expander->expand());
+        $this->assertCount(3, $occurrences);
+
+        // Verifica che '2024-01-02' sia saltato (perché festivo)
+        foreach ($occurrences as $occurrence) {
+            $this->assertNotEquals('2024-01-01', $occurrence->start->format('Y-m-d'));
+        }
+    }
+
+    /**
+     * @throws ScheduleExpandException
+     * @throws \DateMalformedStringException
+     * @throws ScheduleException
+     */
+    public function testWeeklySchedule(): void
+    {
+        $schedule = new Schedule(
+            repeatFrequency: Frequency::WEEKLY,
+            startDate: new DateTimeImmutable('2024-05-01'),
+            startTime: new DateTimeImmutable('2024-05-01 08:00'),
+            repeatCount: 3,
+            duration: 'PT1H',
+            timezone: $this->tz
+        );
+
+        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $this->assertCount(3, $occurrences);
+        $this->assertEquals('2024-05-01 08:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2024-05-08 08:00', $occurrences[1]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2024-05-15 08:00', $occurrences[2]->start->format('Y-m-d H:i'));
+    }
+
+    /**
+     * @throws \DateMalformedStringException
+     * @throws ScheduleExpandException
+     * @throws ScheduleException
+     */
+    public function testMonthlySchedule(): void
+    {
+        $schedule = new Schedule(
+            repeatFrequency: Frequency::MONTHLY,
+            startDate: new DateTimeImmutable('2024-04-10'),
+            startTime: new DateTimeImmutable('2024-04-10 10:00'),
+            repeatCount: 3,
+            duration: 'PT30M',
+            timezone: $this->tz
+        );
+
+        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $this->assertCount(3, $occurrences);
+        $this->assertEquals('2024-04-10 10:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2024-05-10 10:00', $occurrences[1]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2024-06-10 10:00', $occurrences[2]->start->format('Y-m-d H:i'));
+    }
+
+    /**
+     * @throws \DateMalformedStringException
+     * @throws ScheduleExpandException
+     * @throws ScheduleException
+     */
+    public function testYearlySchedule(): void
+    {
+        $schedule = new Schedule(
+            repeatFrequency: Frequency::YEARLY,
+            startDate: new DateTimeImmutable('2022-02-20'),
+            startTime: new DateTimeImmutable('2022-02-20 11:00'),
+            repeatCount: 3,
+            duration: 'PT2H',
+            timezone: $this->tz
+        );
+
+        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $this->assertCount(3, $occurrences);
+        $this->assertEquals('2022-02-20 11:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2023-02-20 11:00', $occurrences[1]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2024-02-20 11:00', $occurrences[2]->start->format('Y-m-d H:i'));
+    }
+
+    /**
+     * @throws \DateMalformedStringException
+     * @throws ScheduleExpandException
+     * @throws ScheduleException
+     */
+    public function testEveryTwoWeeksSchedule(): void
+    {
+        $schedule = new Schedule(
+            repeatFrequency: Frequency::EVERY_TWO_WEEKS,
+            startDate: new DateTimeImmutable('2024-03-01'),
+            startTime: new DateTimeImmutable('2024-03-01 09:00'),
+            repeatCount: 3,
+            duration: 'PT1H',
+            timezone: $this->tz
+        );
+
+        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $this->assertCount(3, $occurrences);
+        $this->assertEquals('2024-03-01 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2024-03-15 09:00', $occurrences[1]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2024-03-29 09:00', $occurrences[2]->start->format('Y-m-d H:i'));
+    }
+
+    /**
+     * @throws ScheduleExpandException
+     * @throws \DateMalformedStringException
+     * @throws ScheduleException
+     */
+    public function testEveryThreeMonthsSchedule(): void
+    {
+        $schedule = new Schedule(
+            repeatFrequency: Frequency::EVERY_THREE_MONTHS,
+            startDate: new DateTimeImmutable('2024-01-31'),
+            startTime: new DateTimeImmutable('2024-01-31 18:00'),
+            repeatCount: 3,
+            duration: 'PT1H',
+            timezone: $this->tz,
+        );
+
+        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+
+        $this->assertCount(3, $occurrences);
+        $this->assertEquals('2024-01-31 18:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2024-05-01 18:00', $occurrences[1]->start->format('Y-m-d H:i')); // attento ai mesi più corti!
+        $this->assertEquals('2024-08-01 18:00', $occurrences[2]->start->format('Y-m-d H:i'));
     }
 
     /** @throws Exception */

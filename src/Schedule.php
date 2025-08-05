@@ -21,6 +21,7 @@ use function array_map;
 use function array_unique;
 use function count;
 use function is_int;
+use function sprintf;
 
 /**
  * Represents an abstract schedule pattern, which can be used to describe
@@ -33,7 +34,7 @@ use function is_int;
 class Schedule
 {
     private const string DEFAULT_TIMEZONE = 'UTC';
-    public DateTimeZone $timezone;
+    public readonly DateTimeZone $timezone;
 
     /**
      * @param Frequency $repeatFrequency The frequency of the occurrences (e.g., Daily/Weekly).
@@ -90,14 +91,12 @@ class Schedule
         }
 
         // Likewise, if startTime and endTime are set but duration is missing, compute it
-        if ($this->startTime === null || $this->endTime === null || $this->duration !== null) {
-            return;
-        }
-
-        try {
-            $this->duration = $this->startTime->diff($this->endTime)->format('PT%hH%iM%sS');
-        } catch (Throwable $throwable) {
-            throw new ScheduleException($throwable->getMessage(), $throwable->getCode(), $throwable);
+        if ($this->startTime !== null && $this->endTime !== null && $this->duration === null) {
+            try {
+                $this->duration = $this->startTime->diff($this->endTime)->format('PT%hH%iM%sS');
+            } catch (Throwable $throwable) {
+                throw new ScheduleException($throwable->getMessage(), $throwable->getCode(), $throwable);
+            }
         }
 
         try {
@@ -107,7 +106,11 @@ class Schedule
         }
     }
 
-    /** @throws ScheduleValidationException */
+    /**
+     * TODO: maybe all in the constructor instead of a separate validation method?
+     *
+     * @throws ScheduleValidationException
+     */
     public function validate(): void
     {
         $errors = [];
@@ -123,14 +126,12 @@ class Schedule
             $errors[] = 'startTime must be before endTime. For now occurrences occupying multiple days(es. an event that starts at 23:00 and ends at 01:00) are unsupported.';
         }
 
-        if ($this->repeatCount !== null) {
-            if ($this->repeatCount < 1) {
-                $errors[] = 'repeatCount must be a positive integer.';
-            }
+        if ($this->repeatCount !== null && $this->repeatCount < 1) {
+            $errors[] = 'repeatCount must be a positive integer.';
         }
 
         // duration, if present, should be positive and valid
-        if ($this->duration) {
+        if ($this->duration !== null) {
             try {
                 $interval = new DateInterval($this->duration);
                 $isZero = ($interval->y === 0 && $interval->m === 0 && $interval->d === 0 && $interval->h === 0 && $interval->i === 0 && $interval->s === 0);
@@ -143,39 +144,60 @@ class Schedule
         }
 
         // byDay: check that all elements are instances of DayOfWeek
-        foreach ($this->byDay as $d) {
-            if (! $d instanceof DayOfWeek) {
-                $errors[] = 'Each "byDay" element must be a DayOfWeek enum instance.';
-                break;
+        foreach ($this->byDay as $index => $dayOfWeek) {
+            if ($dayOfWeek instanceof DayOfWeek) {
+                continue;
             }
+
+            $errors[] = sprintf('Each "byDay" element must be a DayOfWeek enum instance. Errore all\'indice %d.', $index);
         }
 
         // byDay: check for duplicates
-        $byDayValues = array_map(static fn ($d) => $d->value, $this->byDay);
-        if (count(array_unique($byDayValues)) < count($byDayValues)) {
-            $errors[] = 'byDay should not contain duplicates.';
+        if (empty($errors) && count($this->byDay) > 0) {
+            $byDayValues = array_map(static fn (DayOfWeek $dayOfWeek) => $dayOfWeek->value, $this->byDay);
+            if (count(array_unique($byDayValues)) < count($byDayValues)) {
+                $errors[] = 'byDay should not contain duplicates.';
+            }
         }
 
         // byMonth: check that all elements are instances of Month
-        foreach ($this->byMonth as $m) {
-            if ($m instanceof Month) {
+        foreach ($this->byMonth as $month) {
+            if (! $month instanceof Month) {
                 $errors[] = 'Each "byMonth" element must be a Month enum instance.';
                 break;
             }
         }
 
         // byMonthDay: range 1..31 or -31..-1
-        foreach ($this->byMonthDay as $d) {
-            if (! is_int($d) || ($d < 1 && $d > -1) || $d > 31 || $d < -31) {
+        foreach ($this->byMonthDay as $dayOfMonth) {
+            if (
+                ! is_int($dayOfMonth) ||
+                $dayOfMonth === 0 ||
+                $dayOfMonth > 31 ||
+                $dayOfMonth < -31
+            ) {
                 $errors[] = 'byMonthDay must contain only integers in the range 1..31 or -31..-1.';
                 break;
             }
         }
 
         // byMonthWeek: only integers, between 1 and 6 or -1 and -6, no zero
-        foreach ($this->byMonthWeek as $w) {
-            if (! is_int($w) || $w === 0 || $w < -6 || $w > 6) {
+        foreach ($this->byMonthWeek as $week) {
+            if (
+                ! is_int($week) ||
+                $week === 0 ||
+                $week < -6 ||
+                $week > 6
+            ) {
                 $errors[] = 'byMonthWeek must contain only integer values between 1..6 o -1..-6 (0 is inadmissible)';
+                break;
+            }
+        }
+
+        // exceptDates must be DateTimeInterfaces
+        foreach ($this->exceptDates as $index => $exceptDate) {
+            if (! $exceptDate instanceof DateTimeInterface) {
+                $errors[] = sprintf('Each "exceptDates" element must be an instance of DateTimeInterface. Errore all\'indice %d.', $index);
                 break;
             }
         }
