@@ -1,0 +1,49 @@
+{
+  "name": "webdevelovers/schedule",
+  "description": "A PHP library for defining recurring or single event schedules, with support for date rules, exceptions, and holidays.",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Simone Bernini",
+      "email": "simone@webdevelovers.org"
+    }
+  ],
+  "keywords" : ["event","calendar","recurring","schedule","schema.org"],
+  "require": {
+    "php": ">=8.3.0",
+    "cakephp/chronos": "^3.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.4",
+    "solido/php-coding-standards": "dev-master"
+  },
+  "suggest": {
+    "azuyalabs/yasumi": "^2.8"
+  },
+  "autoload": {
+    "psr-4": {
+      "WebDevelovers\\Schedule\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "WebDevelovers\\Schedule\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "phpstan": "phpstan analyse src/ -c phpstan.neon --level=8 --no-progress -vvv --memory-limit=2048M",
+    "cscheck": "vendor/bin/phpcs --standard=Solido src/",
+    "csfix": "vendor/bin/phpcbf --standard=Solido src/"
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {
+      "composer/package-versions-deprecated": true,
+      "dealerdirect/phpcodesniffer-composer-installer": true,
+      "phpstan/extension-installer": true
+    }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}

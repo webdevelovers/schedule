@@ -1,0 +1,61 @@
+# DayOfWeek
+schedule.day.monday: Lunedì
+schedule.day.tuesday: Martedì
+schedule.day.wednesday: Mercoledì
+schedule.day.thursday: Giovedì
+schedule.day.friday: Venerdì
+schedule.day.saturday: Sabato
+schedule.day.sunday: Domenica
+
+# Frequency
+schedule.frequency.none: Nessuna ripetizione
+schedule.frequency.daily: Giornaliera
+schedule.frequency.weekly: Settimanale
+schedule.frequency.every_two_weeks: Ogni due settimane
+schedule.frequency.every_three_weeks: Ogni tre settimane
+schedule.frequency.every_four_weeks: Ogni quattro settimane
+schedule.frequency.monthly: Mensile
+schedule.frequency.every_two_months: Ogni due mesi
+schedule.frequency.every_three_months: Ogni tre mesi
+schedule.frequency.every_four_months: Ogni quattro mesi
+schedule.frequency.every_six_months: Ogni sei mesi
+schedule.frequency.yearly: Annuale
+
+# Month
+schedule.month.january: Gennaio
+schedule.month.february: Febbraio
+schedule.month.march: Marzo
+schedule.month.april: Aprile
+schedule.month.may: Maggio
+schedule.month.june: Giugno
+schedule.month.july: Luglio
+schedule.month.august: Agosto
+schedule.month.september: Settembre
+schedule.month.october: Ottobre
+schedule.month.november: Novembre
+schedule.month.december: Dicembre
+
+# Interval
+schedule.interval: '%interval%'
+schedule.interval.year: '%count% anno'
+schedule.interval.years: '%count% anni'
+schedule.interval.month: '%count% mese'
+schedule.interval.months: '%count% mesi'
+schedule.interval.day: '%count% giorno'
+schedule.interval.days: '%count% giorni'
+schedule.interval.hour: '%count% ora'
+schedule.interval.hours: '%count% ore'
+schedule.interval.minute: '%count% minuto'
+schedule.interval.minutes: '%count% minuti'
+
+# Schedule
+schedule.from_date: 'dal %date%'
+schedule.every_day: 'ogni giorno'
+schedule.every_days: 'ogni %days%'
+schedule.every_month_days: 'ogni mese il %days%'
+schedule.every_x: 'ogni %interval%'
+schedule.from_to: 'dalle %start% alle %end%'
+schedule.from_duration: 'dalle %start% per %duration%'
+schedule.repeat_count: '%count% occorrenze'
+schedule.until: 'fino al %date%'
+schedule.except: 'esclusi %dates%'
