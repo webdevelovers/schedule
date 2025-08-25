@@ -429,7 +429,7 @@ class ScheduleTest extends TestCase
             timezone: 'Europe/Rome'
         );
 
-        $array = $schedule->asArray();
+        $array = $schedule->jsonSerialize();
 
         $this->assertArrayHasKey('startDate', $array);
         $this->assertSame('2024-08-01T00:00:00+00:00', $array['startDate']);
@@ -456,7 +456,7 @@ class ScheduleTest extends TestCase
             repeatInterval: ScheduleInterval::DAILY
         );
 
-        $array = $schedule->asArray();
+        $array = $schedule->jsonSerialize();
 
         $this->assertNull($array['startDate']);
         $this->assertNull($array['endDate']);
@@ -476,7 +476,91 @@ class ScheduleTest extends TestCase
         $this->assertSame(ScheduleInterval::DAILY->value, $array['repeatFrequency']);
         $this->assertNull($array['repeatCount']);
 
-        // Default timezone
         $this->assertSame(date_default_timezone_get(), $array['timezone']);
+    }
+
+    public function testFromJsonRoundTrip(): void
+    {
+        $start = new ChronosDate('2024-08-01');
+        $end = new ChronosDate('2024-08-31');
+        $startTime = new ChronosTime('09:00');
+        $endTime = new ChronosTime('11:00');
+        $except = [
+            new ChronosDate('2024-08-15'),
+            new ChronosDate('2024-08-18')
+        ];
+
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: $start,
+            endDate: $end,
+            startTime: $startTime,
+            endTimeOrDuration: $endTime,
+            repeatCount: 10,
+            byDay: [DayOfWeek::MONDAY],
+            byMonthDay: [1, 15],
+            byMonth: [Month::AUGUST],
+            byMonthWeek: [1],
+            exceptDates: $except,
+            timezone: 'Europe/Rome'
+        );
+
+        $originalArray = $schedule->jsonSerialize();
+
+        $json = json_encode($schedule, JSON_THROW_ON_ERROR);
+        $this->assertIsString($json);
+
+        $restored = Schedule::fromJson($json);
+        $this->assertInstanceOf(Schedule::class, $restored);
+
+        $restoredArray = $restored->jsonSerialize();
+
+        $this->assertEquals($originalArray, $restoredArray);
+    }
+
+    public function testFromJsonWithDurationOnly(): void
+    {
+        $payload = [
+            'repeatFrequency' => ScheduleInterval::DAILY->value,
+            'startDate' => '2024-09-01T00:00:00+00:00',
+            'endDate' => '2024-09-05T00:00:00+00:00',
+            'startTime' => '09:00:00',
+            'endTime' => null,
+            'duration' => 'P0Y0M0DT1H30M0S',
+            'repeatCount' => 5,
+            'timezone' => 'UTC',
+            'byDay' => [DayOfWeek::MONDAY->value, DayOfWeek::WEDNESDAY->value],
+            'byMonthDay' => [1],
+            'byMonth' => [Month::SEPTEMBER->value],
+            'byMonthWeek' => [1],
+            'exceptDates' => ['2024-09-03T00:00:00+00:00'],
+        ];
+
+        $json = json_encode($payload, JSON_THROW_ON_ERROR);
+        $schedule = Schedule::fromJson($json);
+
+        $arr = $schedule->jsonSerialize();
+
+        $this->assertSame('10:30:00', $arr['endTime']);
+        $this->assertSame('09:00:00', $arr['startTime']);
+        $this->assertSame('P0Y0M0DT1H30M0S', $arr['duration']);
+        $this->assertSame('UTC', $arr['timezone']);
+        $this->assertEquals([DayOfWeek::MONDAY->value, DayOfWeek::WEDNESDAY->value], $arr['byDay']);
+        $this->assertEquals([1], $arr['byMonthDay']);
+        $this->assertEquals([Month::SEPTEMBER->value], $arr['byMonth']);
+        $this->assertEquals([1], $arr['byMonthWeek']);
+        $this->assertEquals(['2024-09-03T00:00:00+00:00'], $arr['exceptDates']);
+    }
+
+    public function testFromJsonInvalidPayloadThrows(): void
+    {
+        $this->expectException(ScheduleException::class);
+        Schedule::fromJson('{"repeatFrequency": 123}');
+    }
+
+    public function testFromJsonInvalidJsonThrows(): void
+    {
+        $this->expectException(ScheduleException::class);
+        Schedule::fromJson('{not valid json}');
     }
 }
