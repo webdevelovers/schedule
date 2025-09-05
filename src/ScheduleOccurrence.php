@@ -10,7 +10,7 @@ use DateTimeZone;
 
 readonly class ScheduleOccurrence
 {
-    public DateInterval|null $duration;
+    public DateInterval $duration;
 
     public function __construct(
         public DateTimeInterface $start,
@@ -18,6 +18,7 @@ readonly class ScheduleOccurrence
         public DateTimeZone $timezone,
         public bool $isHoliday,
     ) {
+        $this->duration = $start->diff($end);
     }
 
     /**
@@ -28,7 +29,7 @@ readonly class ScheduleOccurrence
         return [
             'start' => $this->start->format(DATE_ATOM),
             'end' => $this->end->format(DATE_ATOM),
-            'duration' => $this->duration?->format('P%yY%mM%dDT%hH%iM%sS'),
+            'duration' => $this->duration->format('P%yY%mM%dDT%hH%iM%sS'),
             'timezone' => $this->timezone->getName(),
             'isHoliday' => $this->isHoliday ? 'true' : 'false',
         ];

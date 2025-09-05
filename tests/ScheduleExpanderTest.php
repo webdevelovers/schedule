@@ -135,6 +135,27 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2024-01-10 10:00', $occurrences[0]->end->format('Y-m-d H:i'));
     }
 
+    public function testOccurrenceDurationIsComputedOnCreation(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::NONE,
+            startDate: self::chronosDate('2024-01-10'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: 'PT1H30M',
+            timezone: $this->tz
+        );
+
+        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+
+        $this->assertCount(1, $occurrences);
+        $this->assertInstanceOf(\DateInterval::class, $occurrences[0]->duration);
+        $this->assertEquals(
+            $occurrences[0]->end->format('Y-m-d H:i'),
+            $occurrences[0]->start->add($occurrences[0]->duration)->format('Y-m-d H:i'),
+            'start + duration has to coincide with end'
+        );
+    }
+
     public function testNonRecurringIgnoresExceptDates(): void
     {
         $schedule = new Schedule(

@@ -138,7 +138,7 @@ readonly class DefaultHolidayProvider implements HolidayProviderInterface
     }
 
     /** @throws ScheduleHumanizerException */
-    public function isHoliday(DateTimeInterface $date): bool
+    public function isHoliday(ChronosDate $date): bool
     {
         try {
             $yasumi = Yasumi::create($this->country, (int) $date->format('Y'));
