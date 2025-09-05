@@ -42,6 +42,7 @@ class ScheduleHumanizerTest extends TestCase
             'schedule.month.november'            => 'Novembre',
             'schedule.month.december'            => 'Dicembre',
             'schedule.from_date'        => 'dal %date%',
+            'schedule.from_to_date'        => 'dal %start% fino al %end%',
             'schedule.every_day'        => 'ogni giorno',
             'schedule.every_days'       => 'ogni %days%',
             'schedule.every_month_days' => 'ogni mese il %days%',

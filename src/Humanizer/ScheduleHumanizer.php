@@ -32,9 +32,16 @@ readonly class ScheduleHumanizer
         $parts = [];
 
         if ($this->schedule->startDate) {
-            $parts[] = $this->translator->trans('schedule.from_date', [
-                '%date%' => $this->formatDate($this->schedule->startDate->toDateTimeImmutable()),
-            ], domain: 'schedule', locale: $this->locale);
+            if($this->schedule->endDate) {
+                $parts[] = $this->translator->trans('schedule.from_to_date', [
+                    '%start%' => $this->formatDate($this->schedule->startDate->toDateTimeImmutable()),
+                    '%end%' => $this->formatDate($this->schedule->endDate->toDateTimeImmutable()),
+                ], domain: 'schedule', locale: $this->locale);
+            } else {
+                $parts[] = $this->translator->trans('schedule.from_date', [
+                    '%date%' => $this->formatDate($this->schedule->startDate->toDateTimeImmutable()),
+                ], domain: 'schedule', locale: $this->locale);
+            }
         }
 
         // Times (start, end)
@@ -47,10 +54,6 @@ readonly class ScheduleHumanizer
         if ($this->schedule->repeatCount) {
             $parts[] = $this->translator->trans('schedule.repeat_count', [
                 '%count%' => $this->schedule->repeatCount,
-            ], domain: 'schedule', locale: $this->locale);
-        } elseif ($this->schedule->endDate) {
-            $parts[] = $this->translator->trans('schedule.until', [
-                '%date%' => $this->formatDate($this->schedule->endDate->toDateTimeImmutable()),
             ], domain: 'schedule', locale: $this->locale);
         }
 
