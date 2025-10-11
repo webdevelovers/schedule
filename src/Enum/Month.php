@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace WebDevelovers\Schedule\Enum;
 
+use InvalidArgumentException;
+
 enum Month: string
 {
     case JANUARY = 'january';
@@ -52,7 +54,7 @@ enum Month: string
             10 => self::OCTOBER,
             11 => self::NOVEMBER,
             12 => self::DECEMBER,
-            default => throw new \InvalidArgumentException('Invalid month number. Should be between 1 and 12.'),
+            default => throw new InvalidArgumentException('Invalid month number. Should be between 1 and 12.'),
         };
     }
 }

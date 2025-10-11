@@ -8,8 +8,8 @@ use Cake\Chronos\ChronosDate;
 use DateInterval;
 use DateTimeInterface;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
-use WebDevelovers\Schedule\Enum\ScheduleInterval;
 use WebDevelovers\Schedule\Enum\Month;
+use WebDevelovers\Schedule\Enum\ScheduleInterval;
 use WebDevelovers\Schedule\Schedule;
 
 use function array_map;
@@ -32,7 +32,7 @@ readonly class ScheduleHumanizer
         $parts = [];
 
         if ($this->schedule->startDate) {
-            if($this->schedule->endDate) {
+            if ($this->schedule->endDate) {
                 $parts[] = $this->translator->trans('schedule.from_to_date', [
                     '%start%' => $this->formatDate($this->schedule->startDate->toDateTimeImmutable()),
                     '%end%' => $this->formatDate($this->schedule->endDate->toDateTimeImmutable()),

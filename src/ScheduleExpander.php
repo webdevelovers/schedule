@@ -9,18 +9,19 @@ use Cake\Chronos\ChronosTime;
 use DateInterval;
 use DateInvalidTimeZoneException;
 use DateMalformedIntervalStringException;
+use DateMalformedStringException;
 use DateTimeImmutable;
 use DateTimeZone;
 use Generator;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
 use WebDevelovers\Schedule\Enum\Month;
-use WebDevelovers\Schedule\Exception\ScheduleException;
 use WebDevelovers\Schedule\Exception\ScheduleExpandException;
 use WebDevelovers\Schedule\Holiday\HolidayProviderInterface;
 
 use function ceil;
 use function date_default_timezone_get;
 use function in_array;
+use function sprintf;
 
 readonly class ScheduleExpander
 {
@@ -35,7 +36,8 @@ readonly class ScheduleExpander
      *
      * @throws ScheduleExpandException
      */
-    public function expand(): Generator {
+    public function expand(): Generator
+    {
         $schedule = $this->schedule;
         $timezone = self::getTimezone($schedule);
 
@@ -53,7 +55,7 @@ readonly class ScheduleExpander
         $current = $start;
         $occurrences = 0;
         $repeatCount = $schedule->repeatCount;
-        $duration = $schedule->duration !== null ? $schedule->duration : null;
+        $duration = $schedule->duration ?? null;
         $interval = self::scheduleInterval($schedule);
         $endDate = $schedule->endDate;
 
@@ -66,27 +68,27 @@ readonly class ScheduleExpander
                 break;
             }
 
-            if(self::byDayFilterIsApplied($schedule, $current)) {
+            if (self::byDayFilterIsApplied($schedule, $current)) {
                 $current = $current->add($interval);
                 continue;
             }
 
-            if(self::byMonthFilterIsApplied($schedule, $current)) {
+            if (self::byMonthFilterIsApplied($schedule, $current)) {
                 $current = $current->add($interval);
                 continue;
             }
 
-            if(self::byMontDayFilterIsApplied($schedule, $current)) {
+            if (self::byMontDayFilterIsApplied($schedule, $current)) {
                 $current = $current->add($interval);
                 continue;
             }
 
-            if(self::byMonthWeekFilterIsApplied($schedule, $current)) {
+            if (self::byMonthWeekFilterIsApplied($schedule, $current)) {
                 $current = $current->add($interval);
                 continue;
             }
 
-            if(self::isExcludedDate($schedule, $current)) {
+            if (self::isExcludedDate($schedule, $current)) {
                 $current = $current->add($interval);
                 continue;
             }
@@ -104,7 +106,7 @@ readonly class ScheduleExpander
                 start: $startDT,
                 end: $endDT,
                 timezone: $timezone,
-                isHoliday: $isHoliday
+                isHoliday: $isHoliday,
             );
 
             $occurrences++;
@@ -120,7 +122,7 @@ readonly class ScheduleExpander
 
     private static function byMonthFilterIsApplied(Schedule $schedule, ChronosDate $current): bool
     {
-        return  ! empty($schedule->byMonth) &&
+        return ! empty($schedule->byMonth) &&
                 ! in_array(
                     Month::fromNumber((int) $current->format('n')),
                     $schedule->byMonth,
@@ -135,7 +137,7 @@ readonly class ScheduleExpander
 
     private static function byMonthWeekFilterIsApplied(Schedule $schedule, ChronosDate $current): bool
     {
-        if(empty($schedule->byMonthWeek)) {
+        if (empty($schedule->byMonthWeek)) {
             return false;
         }
 
@@ -210,7 +212,7 @@ readonly class ScheduleExpander
 
         try {
             return new DateTimeImmutable(sprintf('%04d-%02d-%02d 00:00:00', $year, $month, $day), $tz);
-        } catch (\DateMalformedStringException $e) {
+        } catch (DateMalformedStringException $e) {
             throw new ScheduleExpandException($e->getMessage(), $e->getCode(), $e);
         }
     }
@@ -221,7 +223,7 @@ readonly class ScheduleExpander
         ChronosTime|null $startTime,
         ChronosTime|null $endTime,
         DateInterval|null $duration,
-        DateTimeZone $tz
+        DateTimeZone $tz,
     ): DateTimeImmutable|null {
         if ($duration !== null) {
             return $startDT->add($duration);

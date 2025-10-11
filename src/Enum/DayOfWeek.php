@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WebDevelovers\Schedule\Enum;
 
 use Cake\Chronos\ChronosDate;
-use DateTimeInterface;
+use InvalidArgumentException;
 
 enum DayOfWeek: string
 {
@@ -17,9 +17,14 @@ enum DayOfWeek: string
     case SATURDAY  = 'saturday';
     case SUNDAY    = 'sunday';
 
+    /** @throws InvalidArgumentException */
     public static function fromDate(ChronosDate $date): self
     {
         $dayNum = (int) $date->format('N');
+
+        if ($dayNum > 7 || $dayNum < 1) {
+            throw new InvalidArgumentException('Invalid day number');
+        }
 
         return match ($dayNum) {
             1 => self::MONDAY,

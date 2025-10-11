@@ -12,15 +12,23 @@ use DateTimeInterface;
 use DateTimeZone;
 use InvalidArgumentException;
 use JsonException;
+use JsonSerializable;
+use Throwable;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
-use WebDevelovers\Schedule\Enum\ScheduleInterval;
 use WebDevelovers\Schedule\Enum\Month;
+use WebDevelovers\Schedule\Enum\ScheduleInterval;
 use WebDevelovers\Schedule\Exception\ScheduleException;
 
+use function array_key_exists;
 use function array_map;
 use function array_unique;
 use function count;
+use function is_array;
 use function is_int;
+use function is_string;
+use function json_decode;
+
+use const JSON_THROW_ON_ERROR;
 
 /**
  * Represents an abstract schedule pattern, which can be used to describe
@@ -30,7 +38,7 @@ use function is_int;
  *
  * @see https://schema.org/Schedule
  */
-readonly class Schedule implements \JsonSerializable
+class Schedule implements JsonSerializable
 {
     private const string DEFAULT_TIMEZONE = 'UTC';
 
@@ -63,18 +71,18 @@ readonly class Schedule implements \JsonSerializable
      * @throws ScheduleException
      */
     public function __construct(
-        public ScheduleInterval              $repeatInterval,
-        public ChronosDate|null              $startDate         = null,
-        public ChronosDate|null              $endDate           = null,
-        public ChronosTime|null              $startTime         = null,
+        public ScheduleInterval $repeatInterval,
+        public ChronosDate|null $startDate = null,
+        public ChronosDate|null $endDate = null,
+        public ChronosTime|null $startTime = null,
         ChronosTime|DateInterval|string|null $endTimeOrDuration = null,
-        public int|null                      $repeatCount       = null,
-        public array                         $byDay             = [],
-        public array                         $byMonthDay        = [],
-        public array                         $byMonth           = [],
-        public array                         $byMonthWeek       = [],
-        public array                         $exceptDates       = [],
-        string|null                          $timezone          = null,
+        public int|null $repeatCount = null,
+        public array $byDay = [],
+        public array $byMonthDay = [],
+        public array $byMonth = [],
+        public array $byMonthWeek = [],
+        public array $exceptDates = [],
+        string|null $timezone = null,
     ) {
         $this->setTimezone($timezone);
         $this->initEndTimeAndDuration($endTimeOrDuration);
@@ -88,14 +96,10 @@ readonly class Schedule implements \JsonSerializable
         $this->validateExceptDates();
     }
 
-    /**
-     * @param ChronosTime|DateInterval|string|null $endTimeOrDuration
-     * @throws ScheduleException
-     */
+    /** @throws ScheduleException */
     private function initEndTimeAndDuration(
         ChronosTime|DateInterval|string|null $endTimeOrDuration,
-    ): void
-    {
+    ): void {
         try {
             [$this->endTime, $this->duration] = DateUtils::endTimeAndDurationFromParam($endTimeOrDuration, $this->startTime);
         } catch (InvalidArgumentException $e) {
@@ -108,6 +112,7 @@ readonly class Schedule implements \JsonSerializable
         return $this->repeatInterval !== ScheduleInterval::NONE;
     }
 
+    /** @return array<string,mixed> */
     public function jsonSerialize(): array
     {
         return [
@@ -206,11 +211,13 @@ readonly class Schedule implements \JsonSerializable
         }
 
         // check for duplicates
-        if (count($this->byDay) > 0) {
-            $byDayValues = array_map(static fn (DayOfWeek $dayOfWeek) => $dayOfWeek->value, $this->byDay);
-            if (count(array_unique($byDayValues)) < count($byDayValues)) {
-                throw new ScheduleException('byDay should not contain duplicates.');
-            }
+        if (count($this->byDay) <= 0) {
+            return;
+        }
+
+        $byDayValues = array_map(static fn (DayOfWeek $dayOfWeek) => $dayOfWeek->value, $this->byDay);
+        if (count(array_unique($byDayValues)) < count($byDayValues)) {
+            throw new ScheduleException('byDay should not contain duplicates.');
         }
     }
 
@@ -224,11 +231,13 @@ readonly class Schedule implements \JsonSerializable
         }
 
         // check for duplicates
-        if (count($this->byMonth) > 0) {
-            $byMonthValues = array_map(static fn (Month $month) => $month->value, $this->byMonth);
-            if (count(array_unique($byMonthValues)) < count($byMonthValues)) {
-                throw new ScheduleException('byMonth should not contain duplicates.');
-            }
+        if (count($this->byMonth) <= 0) {
+            return;
+        }
+
+        $byMonthValues = array_map(static fn (Month $month) => $month->value, $this->byMonth);
+        if (count(array_unique($byMonthValues)) < count($byMonthValues)) {
+            throw new ScheduleException('byMonth should not contain duplicates.');
         }
     }
 
@@ -271,11 +280,13 @@ readonly class Schedule implements \JsonSerializable
             }
         }
 
-        if ($this->startDate && $this->endDate) {
-            foreach ($this->exceptDates as $exceptDate) {
-                if ($exceptDate->lessThan($this->startDate) || $exceptDate->greaterThan($this->endDate)) {
-                    throw new ScheduleException('Some exceptDates are outside the range startDate/endDate.');
-                }
+        if (! $this->startDate || ! $this->endDate) {
+            return;
+        }
+
+        foreach ($this->exceptDates as $exceptDate) {
+            if ($exceptDate->lessThan($this->startDate) || $exceptDate->greaterThan($this->endDate)) {
+                throw new ScheduleException('Some exceptDates are outside the range startDate/endDate.');
             }
         }
     }
@@ -292,88 +303,94 @@ readonly class Schedule implements \JsonSerializable
 
         try {
             $repeatFrequency = $data['repeatFrequency'] ?? null;
-            if (!is_string($repeatFrequency)) {
+            if (! is_string($repeatFrequency)) {
                 throw new ScheduleException('Missing or invalid "repeatFrequency".');
             }
+
             $repeatInterval = ScheduleInterval::from($repeatFrequency);
 
             $startDate = isset($data['startDate'])
-                ? new ChronosDate((string)$data['startDate'])
+                ? new ChronosDate((string) $data['startDate'])
                 : null;
 
             $endDate = isset($data['endDate'])
-                ? new ChronosDate((string)$data['endDate'])
+                ? new ChronosDate((string) $data['endDate'])
                 : null;
 
             $startTime = isset($data['startTime'])
-                ? new ChronosTime((string)$data['startTime'])
+                ? new ChronosTime((string) $data['startTime'])
                 : null;
 
             $endTime = isset($data['endTime'])
-                ? new ChronosTime((string)$data['endTime'])
+                ? new ChronosTime((string) $data['endTime'])
                 : null;
 
             $duration = isset($data['duration'])
-                ? new DateInterval((string)$data['duration'])
+                ? new DateInterval((string) $data['duration'])
                 : null;
 
             $endTimeOrDuration = $endTime ?? $duration;
 
             $repeatCount = isset($data['repeatCount'])
-                ? (int)$data['repeatCount']
+                ? (int) $data['repeatCount']
                 : null;
 
             $timezone = isset($data['timezone'])
-                ? (string)$data['timezone']
+                ? (string) $data['timezone']
                 : null;
 
             $byDay = [];
             if (array_key_exists('byDay', $data) && $data['byDay'] !== null) {
-                if (!is_array($data['byDay'])) {
+                if (! is_array($data['byDay'])) {
                     throw new ScheduleException('"byDay" must be an array or null.');
                 }
+
                 foreach ($data['byDay'] as $val) {
-                    $byDay[] = DayOfWeek::from((string)$val);
+                    $byDay[] = DayOfWeek::from((string) $val);
                 }
             }
 
             $byMonthDay = [];
             if (array_key_exists('byMonthDay', $data) && $data['byMonthDay'] !== null) {
-                if (!is_array($data['byMonthDay'])) {
+                if (! is_array($data['byMonthDay'])) {
                     throw new ScheduleException('"byMonthDay" must be an array or null.');
                 }
+
                 foreach ($data['byMonthDay'] as $val) {
-                    $byMonthDay[] = (int)$val;
+                    $byMonthDay[] = (int) $val;
                 }
             }
 
             $byMonth = [];
             if (array_key_exists('byMonth', $data) && $data['byMonth'] !== null) {
-                if (!is_array($data['byMonth'])) {
+                if (! is_array($data['byMonth'])) {
                     throw new ScheduleException('"byMonth" must be an array or null.');
                 }
+
                 foreach ($data['byMonth'] as $val) {
-                    $byMonth[] = Month::from((string)$val);
+                    $byMonth[] = Month::from((string) $val);
                 }
             }
 
             $byMonthWeek = [];
             if (array_key_exists('byMonthWeek', $data) && $data['byMonthWeek'] !== null) {
-                if (!is_array($data['byMonthWeek'])) {
+                if (! is_array($data['byMonthWeek'])) {
                     throw new ScheduleException('"byMonthWeek" must be an array or null.');
                 }
+
                 foreach ($data['byMonthWeek'] as $val) {
-                    $byMonthWeek[] = (int)$val;
+                    $byMonthWeek[] = (int) $val;
                 }
             }
 
             $exceptDates = [];
             if (array_key_exists('exceptDates', $data) && $data['exceptDates'] !== null) {
-                if (!is_array($data['exceptDates'])) {
+                if (! is_array($data['exceptDates'])) {
                     throw new ScheduleException('"exceptDates" must be an array or null.');
                 }
+
                 foreach ($data['exceptDates'] as $val) {
-                    $exceptDates[] = new ChronosDate((string)$val);
+                    $exceptDates[] = new ChronosDate((string) $val);
                 }
             }
 
@@ -389,13 +406,13 @@ readonly class Schedule implements \JsonSerializable
                 byMonth: $byMonth,
                 byMonthWeek: $byMonthWeek,
                 exceptDates: $exceptDates,
-                timezone: $timezone
+                timezone: $timezone,
             );
-        } catch (\ValueError|\Exception $e) {
-            // ValueError può provenire da Enum::from() o DateInterval invalido
+        } catch (Throwable $e) {
             if ($e instanceof ScheduleException) {
                 throw $e;
             }
+
             throw new ScheduleException('Error creating Schedule from JSON: ' . $e->getMessage(), previous: $e);
         }
     }

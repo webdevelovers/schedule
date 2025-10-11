@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace WebDevelovers\Schedule;
 
 use Cake\Chronos\ChronosTime;
 use DateInterval;
 use DateMalformedIntervalStringException;
 use InvalidArgumentException;
+
+use function strlen;
 
 class DateUtils
 {
@@ -45,7 +49,7 @@ class DateUtils
         if ($endTimeOrDuration instanceof ChronosTime) {
             $startTimeAsDate = $startTime->toDateTimeImmutable();
             $endTimeAsDate = $endTimeOrDuration->toDateTimeImmutable();
-            if($endTimeOrDuration->lessThan($startTime)) {
+            if ($endTimeOrDuration->lessThan($startTime)) {
                 $endTimeAsDate = $endTimeAsDate->add(new DateInterval('P1D'));
             }
 
@@ -54,7 +58,7 @@ class DateUtils
             return [$endTimeOrDuration, $duration];
         }
 
-        if (is_string($endTimeOrDuration) && strlen($endTimeOrDuration) > 0) {
+        if (strlen($endTimeOrDuration) > 0) {
             try {
                 $duration = new DateInterval($endTimeOrDuration);
                 if (
@@ -73,9 +77,8 @@ class DateUtils
                 $endTime = new ChronosTime($endTimeAsDate);
 
                 return [$endTime, $duration];
-
             } catch (DateMalformedIntervalStringException $e) {
-                throw new InvalidArgumentException("Duration as a string should be in ISO8601 format: " . $endTimeOrDuration, 0, $e);
+                throw new InvalidArgumentException('Duration as a string should be in ISO8601 format: ' . $endTimeOrDuration, 0, $e);
             }
         }
 

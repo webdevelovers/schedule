@@ -8,6 +8,8 @@ use DateInterval;
 use DateTimeInterface;
 use DateTimeZone;
 
+use const DATE_ATOM;
+
 readonly class ScheduleOccurrence
 {
     public DateInterval $duration;
@@ -21,9 +23,7 @@ readonly class ScheduleOccurrence
         $this->duration = $start->diff($end);
     }
 
-    /**
-     * @return array<string, string|null>
-     */
+    /** @return array<string, string|null> */
     public function toArray(): array
     {
         return [
@@ -40,6 +40,10 @@ readonly class ScheduleOccurrence
         $startStr = $this->start->format('d-m-Y H:i');
         $endStr = $this->end->format('d-m-Y H:i');
 
-        return $startStr . ' → ' . $endStr . ' (' . $this->timezone->getName() . ') - ' . ' festivo: ' . ($this->isHoliday ? 'si' : 'no');
+        $boundaries = $startStr . ' → ' . $endStr;
+        $timezone = '(' . $this->timezone->getName() . ')';
+        $festivity = 'festivo: ' . ($this->isHoliday ? 'si' : 'no');
+
+        return $boundaries . ' ' . $timezone . ' - ' . $festivity;
     }
 }
