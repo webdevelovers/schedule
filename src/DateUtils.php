@@ -24,10 +24,6 @@ class DateUtils
             return [null, null];
         }
 
-        if ($startTime === null) {
-            throw new InvalidArgumentException('startTime is required when endTimeOrDuration is provided as not null (ChronosTime|DateInterval|string).');
-        }
-
         if ($endTimeOrDuration instanceof DateInterval) {
             if (
                 $endTimeOrDuration->y === 0 &&
@@ -40,6 +36,10 @@ class DateUtils
                 throw new InvalidArgumentException('Duration interval cannot be zero.');
             }
 
+            if ($startTime === null) {
+                throw new InvalidArgumentException('startTime is required when endTimeOrDuration is provided as DateInterval.');
+            }
+
             $startTimeAsDate = $startTime->toDateTimeImmutable();
             $endTime = new ChronosTime($startTimeAsDate->add($endTimeOrDuration));
 
@@ -47,12 +47,16 @@ class DateUtils
         }
 
         if ($endTimeOrDuration instanceof ChronosTime) {
-            $startTimeAsDate = $startTime->toDateTimeImmutable();
             $endTimeAsDate = $endTimeOrDuration->toDateTimeImmutable();
+            if ($startTime === null) {
+                return [$endTimeOrDuration, null];
+            }
+
             if ($endTimeOrDuration->lessThan($startTime)) {
                 $endTimeAsDate = $endTimeAsDate->add(new DateInterval('P1D'));
             }
 
+            $startTimeAsDate = $startTime->toDateTimeImmutable();
             $duration = $startTimeAsDate->diff($endTimeAsDate);
 
             return [$endTimeOrDuration, $duration];
@@ -70,6 +74,10 @@ class DateUtils
                     $duration->s === 0
                 ) {
                     throw new InvalidArgumentException('Duration interval cannot be zero.');
+                }
+
+                if ($startTime === null) {
+                    throw new InvalidArgumentException('startTime is required when endTimeOrDuration is provided as a DateInterval string.');
                 }
 
                 $startTimeAsDate = $startTime->toDateTimeImmutable();

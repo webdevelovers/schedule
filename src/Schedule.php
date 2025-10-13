@@ -112,6 +112,30 @@ class Schedule implements JsonSerializable
         return $this->repeatInterval !== ScheduleInterval::NONE;
     }
 
+    public function toArray(): array
+    {
+        return [
+            'date-interval' => [
+                'startDate' => $this->startDate?->format('Y/m/d'),
+                'endDate' => $this->endDate?->format('Y/m/d'),
+            ],
+            'time-interval' => [
+                'startTime' => $this->startTime?->format('H:i:s'),
+                'endTime' => $this->endTime?->format('H:i:s'),
+            ],
+            'timezone' => $this->timezone->getName(),
+            'duration' => $this->duration?->format('P%yY%mM%dDT%hH%iM%sS'),
+            'repeat-interval' => $this->repeatInterval->value,
+            'repeat-frequency' => $this->repeatInterval->value,
+            'repeat-count' => $this->repeatCount,
+            'by-days' => $this->byDay ? array_map(static fn (DayOfWeek $d) => $d->value, $this->byDay) : null,
+            'by-month-days' => $this->byMonthDay,
+            'by-months' => $this->byMonth ? array_map(static fn (Month $d) => $d->value, $this->byMonth) : null,
+            'by-month-weeks' => $this->byMonthWeek,
+            'except-dates' => array_map(static fn(ChronosDate $chronosDate) => $chronosDate->format('Y/m/d'), $this->exceptDates)
+        ];
+    }
+
     /** @return array<string,mixed> */
     public function jsonSerialize(): array
     {

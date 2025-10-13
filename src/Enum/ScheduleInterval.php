@@ -17,23 +17,23 @@ enum ScheduleInterval: string
     case EVERY_THREE_MONTHS = 'every_three_months';
     case EVERY_FOUR_MONTHS = 'every_four_months';
     case EVERY_SIX_MONTHS = 'every_six_months';
-    case YEARLY = 'yearly';
+    case EVERY_YEAR = 'every_year';
 
     public function label(): string
     {
         return match ($this) {
-            self::NONE               => 'schedule.frequency.none',
-            self::DAILY              => 'schedule.frequency.daily',
+            self::NONE                   => 'schedule.frequency.none',
+            self::DAILY                  => 'schedule.frequency.daily',
             self::EVERY_WEEK             => 'schedule.frequency.every_week',
-            self::EVERY_TWO_WEEKS    => 'schedule.frequency.every_two_weeks',
-            self::EVERY_THREE_WEEKS  => 'schedule.frequency.every_three_weeks',
-            self::EVERY_FOUR_WEEKS   => 'schedule.frequency.every_four_weeks',
+            self::EVERY_TWO_WEEKS        => 'schedule.frequency.every_two_weeks',
+            self::EVERY_THREE_WEEKS      => 'schedule.frequency.every_three_weeks',
+            self::EVERY_FOUR_WEEKS       => 'schedule.frequency.every_four_weeks',
             self::EVERY_MONTH            => 'schedule.frequency.every_month',
-            self::EVERY_TWO_MONTHS   => 'schedule.frequency.every_two_months',
-            self::EVERY_THREE_MONTHS => 'schedule.frequency.every_three_months',
-            self::EVERY_FOUR_MONTHS  => 'schedule.frequency.every_four_months',
-            self::EVERY_SIX_MONTHS   => 'schedule.frequency.every_six_months',
-            self::YEARLY             => 'schedule.frequency.yearly',
+            self::EVERY_TWO_MONTHS       => 'schedule.frequency.every_two_months',
+            self::EVERY_THREE_MONTHS     => 'schedule.frequency.every_three_months',
+            self::EVERY_FOUR_MONTHS      => 'schedule.frequency.every_four_months',
+            self::EVERY_SIX_MONTHS       => 'schedule.frequency.every_six_months',
+            self::EVERY_YEAR             => 'schedule.frequency.every_year',
         };
     }
 
@@ -51,7 +51,7 @@ enum ScheduleInterval: string
             self::EVERY_THREE_MONTHS => 'P3M',
             self::EVERY_FOUR_MONTHS  => 'P4M',
             self::EVERY_SIX_MONTHS   => 'P6M',
-            self::YEARLY             => 'P1Y',
+            self::EVERY_YEAR         => 'P1Y',
         };
     }
 

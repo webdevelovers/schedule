@@ -177,7 +177,10 @@ readonly class ScheduleExpander
     private function handleNonRecurring(
         Schedule $schedule,
     ): Generator {
-        if ($schedule->startDate === null) {
+        if (
+            $schedule->startDate === null ||
+            ($schedule->startTime === null && $schedule->endTime === null)
+        ) {
             return;
         }
 

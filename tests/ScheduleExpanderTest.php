@@ -76,14 +76,16 @@ final class ScheduleExpanderTest extends TestCase
         $schedule = new Schedule(
             repeatInterval: ScheduleInterval::NONE,
             startDate: self::chronosDate('2024-01-10'),
+            startTime: self::chronosTime('15:30'),
+            endTimeOrDuration: self::chronosTime('16:30'),
             timezone: $this->tz
         );
 
         $occurrences = iterator_to_array($this->expander($schedule)->expand());
 
         $this->assertCount(1, $occurrences);
-        $this->assertEquals('2024-01-10 00:00', $occurrences[0]->start->format('Y-m-d H:i'));
-        $this->assertEquals('2024-01-10 00:00', $occurrences[0]->end->format('Y-m-d H:i'));
+        $this->assertEquals('2024-01-10 15:30', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2024-01-10 16:30', $occurrences[0]->end->format('Y-m-d H:i'));
     }
 
     public function testNonRecurringWithStartTimeNoEndOrDuration(): void
@@ -573,7 +575,7 @@ final class ScheduleExpanderTest extends TestCase
     public function testYearlySchedule(): void
     {
         $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::YEARLY,
+            repeatInterval: ScheduleInterval::EVERY_YEAR,
             startDate: self::chronosDate('2022-02-20'),
             startTime: self::chronosTime('11:00'),
             endTimeOrDuration: 'PT2H',
