@@ -4,6 +4,7 @@ namespace WebDevelovers\Schedule\Tests;
 
 use Cake\Chronos\ChronosDate;
 use Cake\Chronos\ChronosTime;
+use JsonException;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 use WebDevelovers\Schedule\Enum\ScheduleInterval;
@@ -226,5 +227,105 @@ class ScheduleAggregateTest extends TestCase
         $subset = $agg->intersecting(new ChronosDate('2025-01-11'), new ChronosDate('2025-01-15'));
 
         $this->assertCount(0, $subset->all());
+    }
+
+    /** @throws ScheduleException */
+    public function testToArrayFromArrayRoundTrip(): void
+    {
+        $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
+        $s2 = $this->makeSchedule('2025-02-01', '2025-02-05');
+
+        $agg = new ScheduleAggregate([$s1, $s2]);
+
+        $array = $agg->toArray();
+        $restored = ScheduleAggregate::fromArray($array);
+
+        $this->assertInstanceOf(ScheduleAggregate::class, $restored);
+        $this->assertCount(2, $restored->all());
+        $this->assertEquals($agg->toArray(), $restored->toArray());
+    }
+
+    /** @throws ScheduleException */
+    public function testSerializeUnserializeRoundTrip(): void
+    {
+        $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
+        $s2 = $this->makeSchedule('2025-02-01', '2025-02-05');
+
+        $agg = new ScheduleAggregate([$s1, $s2]);
+
+        $serialized = serialize($agg);
+        $this->assertIsString($serialized);
+
+        $unserialized = unserialize($serialized);
+        $this->assertInstanceOf(ScheduleAggregate::class, $unserialized);
+
+        $this->assertCount(2, $unserialized->all());
+        $this->assertEquals($agg->toArray(), $unserialized->toArray());
+    }
+
+    /** @throws JsonException */
+    public function testToJsonMethod(): void
+    {
+        $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
+        $s2 = $this->makeSchedule('2025-02-01', '2025-02-05');
+
+        $agg = new ScheduleAggregate([$s1, $s2]);
+
+        $json = $agg->toJson();
+        $this->assertIsString($json);
+
+        $decoded = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+        $this->assertIsArray($decoded);
+        $this->assertArrayHasKey('type', $decoded);
+        $this->assertSame('ScheduleAggregate', $decoded['type']);
+        $this->assertArrayHasKey('schedules', $decoded);
+        $this->assertCount(2, $decoded['schedules']);
+        $this->assertArrayHasKey('bounds', $decoded);
+    }
+
+    public function testFromArrayMissingSchedulesThrows(): void
+    {
+        $this->expectException(ScheduleException::class);
+        $this->expectExceptionMessage('Missing "schedules" array');
+
+        ScheduleAggregate::fromArray([
+            'type' => 'ScheduleAggregate',
+        ]);
+    }
+
+    public function testFromArrayInvalidScheduleElementThrows(): void
+    {
+        $this->expectException(ScheduleException::class);
+
+        ScheduleAggregate::fromArray([
+            'schedules' => [
+                ['repeatInterval' => 'invalid'],
+            ],
+        ]);
+    }
+
+    /** @throws ScheduleException */
+    public function testFromArrayWithEmptySchedules(): void
+    {
+        $agg = ScheduleAggregate::fromArray([
+            'schedules' => [],
+        ]);
+
+        $this->assertInstanceOf(ScheduleAggregate::class, $agg);
+        $this->assertCount(0, $agg->all());
+    }
+
+    /** @throws ScheduleException */
+    public function testJsonSerializeMatchesToArray(): void
+    {
+        $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
+        $s2 = $this->makeSchedule('2025-02-01', '2025-02-05');
+
+        $agg = new ScheduleAggregate([$s1, $s2]);
+
+        $jsonSerialized = $agg->jsonSerialize();
+        $toArray = $agg->toArray();
+
+        $this->assertEquals($toArray, $jsonSerialized);
     }
 }

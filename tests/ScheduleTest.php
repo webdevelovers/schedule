@@ -4,6 +4,7 @@ namespace WebDevelovers\Schedule\Tests;
 
 use Cake\Chronos\ChronosDate;
 use Cake\Chronos\ChronosTime;
+use JsonException;
 use PHPUnit\Framework\TestCase;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
 use WebDevelovers\Schedule\Enum\Month;
@@ -432,12 +433,12 @@ class ScheduleTest extends TestCase
         $array = $schedule->jsonSerialize();
 
         $this->assertArrayHasKey('startDate', $array);
-        $this->assertSame('2024-08-01T00:00:00+00:00', $array['startDate']);
-        $this->assertSame('2024-08-31T00:00:00+00:00', $array['endDate']);
+        $this->assertSame('2024/08/01', $array['startDate']);
+        $this->assertSame('2024/08/31', $array['endDate']);
         $this->assertSame('09:00:00', $array['startTime']);
         $this->assertSame('11:00:00', $array['endTime']);
         $this->assertSame('P0Y0M0DT2H0M0S', $array['duration']);
-        $this->assertSame(ScheduleInterval::DAILY->value, $array['repeatFrequency']);
+        $this->assertSame(ScheduleInterval::DAILY->value, $array['repeatInterval']);
         $this->assertSame(10, $array['repeatCount']);
         $this->assertSame('Europe/Rome', $array['timezone']);
         $this->assertEquals([DayOfWeek::MONDAY->value], $array['byDay']);
@@ -445,8 +446,8 @@ class ScheduleTest extends TestCase
         $this->assertEquals([Month::AUGUST->value], $array['byMonth']);
         $this->assertEquals([1], $array['byMonthWeek']);
         $this->assertEquals([
-            $except[0]->format(DATE_ATOM),
-            $except[1]->format(DATE_ATOM)
+            $except[0]->format('Y/m/d'),
+            $except[1]->format('Y/m/d')
         ], $array['exceptDates']);
     }
 
@@ -473,7 +474,7 @@ class ScheduleTest extends TestCase
         $this->assertIsArray($array['exceptDates']);
         $this->assertEmpty($array['exceptDates']);
 
-        $this->assertSame(ScheduleInterval::DAILY->value, $array['repeatFrequency']);
+        $this->assertSame(ScheduleInterval::DAILY->value, $array['repeatInterval']);
         $this->assertNull($array['repeatCount']);
 
         $this->assertSame(date_default_timezone_get(), $array['timezone']);
@@ -521,9 +522,9 @@ class ScheduleTest extends TestCase
     public function testFromJsonWithDurationOnly(): void
     {
         $payload = [
-            'repeatFrequency' => ScheduleInterval::DAILY->value,
-            'startDate' => '2024-09-01T00:00:00+00:00',
-            'endDate' => '2024-09-05T00:00:00+00:00',
+            'repeatInterval' => ScheduleInterval::DAILY->value,
+            'startDate' => '2024/09/01',
+            'endDate' => '2024/09/05',
             'startTime' => '09:00:00',
             'endTime' => null,
             'duration' => 'P0Y0M0DT1H30M0S',
@@ -533,7 +534,7 @@ class ScheduleTest extends TestCase
             'byMonthDay' => [1],
             'byMonth' => [Month::SEPTEMBER->value],
             'byMonthWeek' => [1],
-            'exceptDates' => ['2024-09-03T00:00:00+00:00'],
+            'exceptDates' => ['2024/09/03'],
         ];
 
         $json = json_encode($payload, JSON_THROW_ON_ERROR);
@@ -549,18 +550,154 @@ class ScheduleTest extends TestCase
         $this->assertEquals([1], $arr['byMonthDay']);
         $this->assertEquals([Month::SEPTEMBER->value], $arr['byMonth']);
         $this->assertEquals([1], $arr['byMonthWeek']);
-        $this->assertEquals(['2024-09-03T00:00:00+00:00'], $arr['exceptDates']);
+        $this->assertEquals(['2024/09/03'], $arr['exceptDates']);
     }
 
     public function testFromJsonInvalidPayloadThrows(): void
     {
         $this->expectException(ScheduleException::class);
-        Schedule::fromJson('{"repeatFrequency": 123}');
+        Schedule::fromJson('{"repeatInterval": 123}');
     }
 
     public function testFromJsonInvalidJsonThrows(): void
     {
         $this->expectException(ScheduleException::class);
         Schedule::fromJson('{not valid json}');
+    }
+
+    /** @throws ScheduleException */
+    public function testToArrayFromArrayRoundTrip(): void
+    {
+        $start = new ChronosDate('2024-08-01');
+        $end = new ChronosDate('2024-08-31');
+        $startTime = new ChronosTime('09:00');
+        $endTime = new ChronosTime('11:00');
+        $except = [
+            new ChronosDate('2024-08-15'),
+            new ChronosDate('2024-08-18')
+        ];
+
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: $start,
+            endDate: $end,
+            startTime: $startTime,
+            endTimeOrDuration: $endTime,
+            repeatCount: 10,
+            byDay: [DayOfWeek::MONDAY],
+            byMonthDay: [1, 15],
+            byMonth: [Month::AUGUST],
+            byMonthWeek: [1],
+            exceptDates: $except,
+            timezone: 'Europe/Rome'
+        );
+
+        $array = $schedule->toArray();
+        $restored = Schedule::fromArray($array);
+
+        $this->assertEquals($schedule->toArray(), $restored->toArray());
+        $this->assertSame($schedule->repeatInterval, $restored->repeatInterval);
+        $this->assertEquals($schedule->startDate, $restored->startDate);
+        $this->assertEquals($schedule->endDate, $restored->endDate);
+        $this->assertEquals($schedule->startTime, $restored->startTime);
+        $this->assertEquals($schedule->endTime, $restored->endTime);
+        $this->assertSame($schedule->timezone->getName(), $restored->timezone->getName());
+    }
+
+    /** @throws ScheduleException */
+    public function testSerializeUnserializeRoundTrip(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::EVERY_WEEK,
+            startDate: new ChronosDate('2024-08-01'),
+            endDate: new ChronosDate('2024-08-31'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: new ChronosTime('11:00'),
+            repeatCount: 10,
+            byDay: [DayOfWeek::MONDAY, DayOfWeek::WEDNESDAY],
+            byMonthDay: [1, 15],
+            byMonth: [Month::AUGUST],
+            byMonthWeek: [1, -1],
+            exceptDates: [new ChronosDate('2024-08-15')],
+            timezone: 'Europe/Rome'
+        );
+
+        $serialized = serialize($schedule);
+        $this->assertIsString($serialized);
+
+        $unserialized = unserialize($serialized);
+        $this->assertInstanceOf(Schedule::class, $unserialized);
+
+        $this->assertEquals($schedule->toArray(), $unserialized->toArray());
+        $this->assertSame($schedule->repeatInterval, $unserialized->repeatInterval);
+        $this->assertEquals($schedule->startDate, $unserialized->startDate);
+        $this->assertEquals($schedule->endDate, $unserialized->endDate);
+    }
+
+    /** @throws JsonException */
+    public function testToJsonMethod(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-08-01'),
+            endDate: new ChronosDate('2024-08-31'),
+            timezone: 'UTC'
+        );
+
+        $json = $schedule->toJson();
+        $this->assertIsString($json);
+
+        $decoded = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+        $this->assertIsArray($decoded);
+        $this->assertArrayHasKey('repeatInterval', $decoded);
+        $this->assertSame(ScheduleInterval::DAILY->value, $decoded['repeatInterval']);
+    }
+
+    public function testFromArrayMissingRepeatIntervalThrows(): void
+    {
+        $this->expectException(ScheduleException::class);
+        $this->expectExceptionMessage('Missing or invalid "repeatInterval"');
+
+        Schedule::fromArray([
+            'startDate' => '2024/08/01',
+        ]);
+    }
+
+    public function testFromArrayInvalidRepeatIntervalThrows(): void
+    {
+        $this->expectException(ScheduleException::class);
+
+        Schedule::fromArray([
+            'repeatInterval' => 'invalid_interval',
+        ]);
+    }
+
+    /** @throws ScheduleException */
+    public function testFromArrayWithNullableFields(): void
+    {
+        $array = [
+            'repeatInterval' => ScheduleInterval::DAILY->value,
+            'startDate' => null,
+            'endDate' => null,
+            'startTime' => null,
+            'endTime' => null,
+            'duration' => null,
+            'repeatCount' => null,
+            'timezone' => 'UTC',
+            'byDay' => null,
+            'byMonthDay' => null,
+            'byMonth' => null,
+            'byMonthWeek' => null,
+            'exceptDates' => null,
+        ];
+
+        $schedule = Schedule::fromArray($array);
+
+        $this->assertInstanceOf(Schedule::class, $schedule);
+        $this->assertNull($schedule->startDate);
+        $this->assertNull($schedule->endDate);
+        $this->assertNull($schedule->startTime);
+        $this->assertEmpty($schedule->byDay);
+        $this->assertEmpty($schedule->byMonth);
     }
 }

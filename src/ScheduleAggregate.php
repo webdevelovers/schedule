@@ -8,6 +8,7 @@ use Cake\Chronos\ChronosDate;
 use DateTimeInterface;
 use JsonException;
 use JsonSerializable;
+use Throwable;
 use WebDevelovers\Schedule\Exception\ScheduleException;
 
 use function array_map;
@@ -20,7 +21,7 @@ use function sprintf;
 
 use const JSON_THROW_ON_ERROR;
 
-readonly class ScheduleAggregate implements JsonSerializable
+class ScheduleAggregate implements JsonSerializable
 {
     /** @var Schedule[] */
     private array $schedules;
@@ -36,19 +37,100 @@ readonly class ScheduleAggregate implements JsonSerializable
         $this->schedules = array_values($schedules);
     }
 
-    /** @return array<string,mixed> */
-    public function jsonSerialize(): array
+    /**
+     * Converts the aggregate to an array representation
+     *
+     * @return array<string,mixed>
+     */
+    public function toArray(): array
     {
         [$minStart, $maxEnd] = $this->getBounds();
 
         return [
             'type' => 'ScheduleAggregate',
-            'schedules' => array_map(static fn (Schedule $s) => $s->jsonSerialize(), $this->schedules),
+            'schedules' => array_map(static fn (Schedule $s) => $s->toArray(), $this->schedules),
             'bounds' => [
                 'startDate' => $minStart?->format(DateTimeInterface::ATOM),
                 'endDate' => $maxEnd?->format(DateTimeInterface::ATOM),
             ],
         ];
+    }
+
+    /**
+     * Creates a ScheduleAggregate from an array representation
+     *
+     * @param array<string,mixed> $data
+     * @throws ScheduleException
+     */
+    public static function fromArray(array $data): self
+    {
+        try {
+            if (! isset($data['schedules']) || ! is_array($data['schedules'])) {
+                throw new ScheduleException('Missing "schedules" array.');
+            }
+
+            $schedules = [];
+            foreach ($data['schedules'] as $idx => $scheduleData) {
+                if (! is_array($scheduleData)) {
+                    throw new ScheduleException('Each element of "schedules" must be an array.');
+                }
+
+                $schedules[] = Schedule::fromArray($scheduleData);
+            }
+
+            return new self($schedules);
+        } catch (Throwable $e) {
+            if ($e instanceof ScheduleException) {
+                throw $e;
+            }
+
+            throw new ScheduleException('Error creating ScheduleAggregate from array: ' . $e->getMessage(), previous: $e);
+        }
+    }
+
+    public function __serialize(): array
+    {
+        return $this->toArray();
+    }
+
+    /** @throws ScheduleException */
+    public function __unserialize(array $data): void
+    {
+        $instance = self::fromArray($data);
+        $this->schedules = $instance->schedules;
+    }
+
+    /**
+     * Converts to JSON string
+     *
+     * @throws JsonException
+     */
+    public function toJson(): string
+    {
+        return json_encode($this->jsonSerialize(), JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Creates a ScheduleAggregate from JSON string
+     *
+     * @throws ScheduleException
+     */
+    public static function fromJson(string $json): self
+    {
+        try {
+            /** @var array<string,mixed> $data */
+            $data = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new ScheduleException('Invalid JSON: ' . $e->getMessage(), previous: $e);
+        }
+
+        return self::fromArray($data);
+    }
+
+    /** @return array<string,mixed> */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 
     /** @return Schedule[] */
@@ -139,36 +221,6 @@ readonly class ScheduleAggregate implements JsonSerializable
         return new self($filtered);
     }
 
-    /** @throws ScheduleException */
-    public static function fromJson(string $json): self
-    {
-        try {
-            /** @var array{ schedules?: array<int, array<string,mixed>> } $data */
-            $data = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
-        } catch (JsonException $e) {
-            throw new ScheduleException('Invalid JSON: ' . $e->getMessage(), previous: $e);
-        }
-
-        if (! isset($data['schedules']) || ! is_array($data['schedules'])) {
-            throw new ScheduleException('Missing "schedules" array.');
-        }
-
-        $schedules = [];
-        foreach ($data['schedules'] as $idx => $scheduleData) {
-            if (! is_array($scheduleData)) {
-                throw new ScheduleException('Each element of "schedules" must be an object.');
-            }
-
-            try {
-                $schedules[] = Schedule::fromJson((string) json_encode($scheduleData, JSON_THROW_ON_ERROR));
-            } catch (JsonException $e) {
-                throw new ScheduleException('JSON error in schedule #' . ($idx + 1) . ': ' . $e->getMessage(), previous: $e);
-            }
-        }
-
-        return new self($schedules);
-    }
-
     /**
      * @param Schedule[] $schedules
      *
@@ -181,5 +233,10 @@ readonly class ScheduleAggregate implements JsonSerializable
                 throw new ScheduleException(sprintf('Element at index %d is not a Schedule instance.', $i));
             }
         }
+    }
+
+    public function getSchedules(): array
+    {
+        return $this->schedules;
     }
 }
