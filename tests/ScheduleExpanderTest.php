@@ -8,8 +8,11 @@ use PHPUnit\Framework\TestCase;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
 use WebDevelovers\Schedule\Enum\Month;
 use WebDevelovers\Schedule\Enum\ScheduleInterval;
+use WebDevelovers\Schedule\Exception\ScheduleException;
+use WebDevelovers\Schedule\Exception\ScheduleExpandException;
 use WebDevelovers\Schedule\Holiday\HolidayProviderInterface;
 use WebDevelovers\Schedule\Schedule;
+use WebDevelovers\Schedule\ScheduleAggregate;
 use WebDevelovers\Schedule\ScheduleExpander;
 use WebDevelovers\Schedule\ScheduleOccurrence;
 
@@ -612,6 +615,138 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2024-03-18 09:00', $occurrences[1]->start->format('Y-m-d H:i'));
         $this->assertEquals('Monday', $occurrences[0]->start->format('l'));
         $this->assertEquals('Monday', $occurrences[1]->start->format('l'));
+    }
+
+    /**
+     * @throws ScheduleExpandException
+     * @throws ScheduleException
+     */
+    public function testExpandAggregateWithMultipleSchedules(): void
+    {
+        $s1 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 2,
+            timezone: $this->tz
+        );
+
+        $s2 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-05'),
+            startTime: self::chronosTime('14:00'),
+            endTimeOrDuration: 'PT30M',
+            repeatCount: 2,
+            timezone: $this->tz
+        );
+
+        $aggregate = new ScheduleAggregate([$s1, $s2]);
+
+        $occurrences = iterator_to_array(ScheduleExpander::expandAggregate($aggregate, $this->holidaysProvider), false);
+
+        $this->assertCount(4, $occurrences);
+    }
+
+    /** @throws ScheduleException */
+    public function testExpandAggregateSorted(): void
+    {
+        $s1 = new Schedule(
+            repeatInterval: ScheduleInterval::NONE,
+            startDate: self::chronosDate('2025-01-10'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            timezone: $this->tz
+        );
+
+        $s2 = new Schedule(
+            repeatInterval: ScheduleInterval::NONE,
+            startDate: self::chronosDate('2025-01-05'),
+            startTime: self::chronosTime('14:00'),
+            endTimeOrDuration: 'PT30M',
+            timezone: $this->tz
+        );
+
+        $s3 = new Schedule(
+            repeatInterval: ScheduleInterval::NONE,
+            startDate: self::chronosDate('2025-01-08'),
+            startTime: self::chronosTime('11:00'),
+            endTimeOrDuration: 'PT2H',
+            timezone: $this->tz
+        );
+
+        $aggregate = new ScheduleAggregate([$s1, $s2, $s3]);
+
+        $occurrences = ScheduleExpander::expandAggregateSorted($aggregate, $this->holidaysProvider);
+
+        $this->assertCount(3, $occurrences);
+        $this->assertEquals('2025-01-05 14:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2025-01-08 11:00', $occurrences[1]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2025-01-10 09:00', $occurrences[2]->start->format('Y-m-d H:i'));
+    }
+
+    /** @throws ScheduleException */
+    public function testExpandAggregateSortedDescending(): void
+    {
+        $s1 = new Schedule(
+            repeatInterval: ScheduleInterval::NONE,
+            startDate: self::chronosDate('2025-01-05'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            timezone: $this->tz
+        );
+
+        $s2 = new Schedule(
+            repeatInterval: ScheduleInterval::NONE,
+            startDate: self::chronosDate('2025-01-10'),
+            startTime: self::chronosTime('14:00'),
+            endTimeOrDuration: 'PT30M',
+            timezone: $this->tz
+        );
+
+        $aggregate = new ScheduleAggregate([$s1, $s2]);
+
+        $occurrences = ScheduleExpander::expandAggregateSorted($aggregate, $this->holidaysProvider, false);
+
+        $this->assertCount(2, $occurrences);
+        $this->assertEquals('2025-01-10 14:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2025-01-05 09:00', $occurrences[1]->start->format('Y-m-d H:i'));
+    }
+
+    /** @throws ScheduleException */
+    public function testExpandAggregateWithRecurringSchedules(): void
+    {
+        $s1 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 3,
+            timezone: $this->tz
+        );
+
+        $s2 = new Schedule(
+            repeatInterval: ScheduleInterval::EVERY_WEEK,
+            startDate: self::chronosDate('2025-01-01'),
+            startTime: self::chronosTime('14:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 2,
+            timezone: $this->tz
+        );
+
+        $aggregate = new ScheduleAggregate([$s1, $s2]);
+
+        $occurrences = ScheduleExpander::expandAggregateSorted($aggregate, $this->holidaysProvider);
+
+        $this->assertCount(5, $occurrences);
+
+        // Check that occurrences are properly sorted
+        for ($i = 1; $i < count($occurrences); $i++) {
+            $this->assertLessThanOrEqual(
+                $occurrences[$i]->start->getTimestamp(),
+                $occurrences[$i]->start->getTimestamp()
+            );
+        }
     }
 
     private static function chronosDate(string $date): ChronosDate

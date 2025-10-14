@@ -328,4 +328,93 @@ class ScheduleAggregateTest extends TestCase
 
         $this->assertEquals($toArray, $jsonSerialized);
     }
+
+    /** @throws ScheduleException */
+    public function testSortedByStartDateAscending(): void
+    {
+        $s1 = $this->makeSchedule('2025-03-01', '2025-03-10');
+        $s2 = $this->makeSchedule('2025-01-01', '2025-01-10');
+        $s3 = $this->makeSchedule('2025-02-01', '2025-02-10');
+
+        $agg = new ScheduleAggregate([$s1, $s2, $s3]);
+        $sorted = $agg->sortedBy('startDate');
+
+        $dates = array_map(
+            static fn (Schedule $s) => $s->startDate?->format('Y-m-d'),
+            $sorted->all()
+        );
+
+        $this->assertSame(['2025-01-01', '2025-02-01', '2025-03-01'], $dates);
+
+        // Original should remain unchanged
+        $this->assertSame('2025-03-01', $agg->all()[0]->startDate?->format('Y-m-d'));
+    }
+
+    /** @throws ScheduleException */
+    public function testSortedByStartDateDescending(): void
+    {
+        $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
+        $s2 = $this->makeSchedule('2025-03-01', '2025-03-10');
+        $s3 = $this->makeSchedule('2025-02-01', '2025-02-10');
+
+        $agg = new ScheduleAggregate([$s1, $s2, $s3]);
+        $sorted = $agg->sortedBy('startDate', false);
+
+        $dates = array_map(
+            static fn (Schedule $s) => $s->startDate?->format('Y-m-d'),
+            $sorted->all()
+        );
+
+        $this->assertSame(['2025-03-01', '2025-02-01', '2025-01-01'], $dates);
+    }
+
+    /** @throws ScheduleException */
+    public function testSortedByStartDateWithNulls(): void
+    {
+        $s1 = $this->makeSchedule('2025-02-01', '2025-02-10');
+        $s2 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: null,
+            startTime: new ChronosTime('09:00:00'),
+            endTimeOrDuration: new ChronosTime('11:00:00')
+        );
+        $s3 = $this->makeSchedule('2025-01-01', '2025-01-10');
+
+        $agg = new ScheduleAggregate([$s1, $s2, $s3]);
+        $sorted = $agg->sortedBy('startDate');
+
+        $all = $sorted->all();
+        $this->assertSame('2025-01-01', $all[0]->startDate?->format('Y-m-d'));
+        $this->assertSame('2025-02-01', $all[1]->startDate?->format('Y-m-d'));
+        $this->assertNull($all[2]->startDate); // Null goes to the end
+    }
+
+    /** @throws ScheduleException */
+    public function testSortedByEndDate(): void
+    {
+        $s1 = $this->makeSchedule('2025-01-01', '2025-03-31');
+        $s2 = $this->makeSchedule('2025-01-01', '2025-01-31');
+        $s3 = $this->makeSchedule('2025-01-01', '2025-02-28');
+
+        $agg = new ScheduleAggregate([$s1, $s2, $s3]);
+        $sorted = $agg->sortedBy('endDate');
+
+        $dates = array_map(
+            static fn (Schedule $s) => $s->endDate?->format('Y-m-d'),
+            $sorted->all()
+        );
+
+        $this->assertSame(['2025-01-31', '2025-02-28', '2025-03-31'], $dates);
+    }
+
+    public function testSortedByInvalidFieldThrows(): void
+    {
+        $this->expectException(ScheduleException::class);
+        $this->expectExceptionMessage('Invalid sort field: invalidField');
+
+        $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
+        $agg = new ScheduleAggregate([$s1]);
+
+        $agg->sortedBy('invalidField');
+    }
 }

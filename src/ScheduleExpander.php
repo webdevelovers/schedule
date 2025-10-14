@@ -32,6 +32,46 @@ readonly class ScheduleExpander
     }
 
     /**
+     * Expands a ScheduleAggregate into all occurrences from all schedules
+     *
+     * @return Generator<ScheduleOccurrence>
+     *
+     * @throws ScheduleExpandException
+     */
+    public static function expandAggregate(
+        ScheduleAggregate $aggregate,
+        HolidayProviderInterface|null $holidaysProvider = null,
+    ): Generator {
+        foreach ($aggregate->all() as $schedule) {
+            $expander = new self($schedule, $holidaysProvider);
+            yield from $expander->expand();
+        }
+    }
+
+    /**
+     * Expands a ScheduleAggregate into all occurrences, sorted by start datetime
+     *
+     * @return ScheduleOccurrence[]
+     *
+     * @throws ScheduleExpandException
+     */
+    public static function expandAggregateSorted(
+        ScheduleAggregate $aggregate,
+        HolidayProviderInterface|null $holidaysProvider = null,
+        bool $ascending = true,
+    ): array {
+        $occurrences = iterator_to_array(self::expandAggregate($aggregate, $holidaysProvider), false);
+
+        usort($occurrences, static function (ScheduleOccurrence $a, ScheduleOccurrence $b) use ($ascending): int {
+            $comparison = $a->start <=> $b->start;
+
+            return $ascending ? $comparison : -$comparison;
+        });
+
+        return $occurrences;
+    }
+
+    /**
      * @return Generator<ScheduleOccurrence>
      *
      * @throws ScheduleExpandException
@@ -52,19 +92,21 @@ readonly class ScheduleExpander
             return;
         }
 
+        // TODO: review
+        // For recurring schedules, we need either endTime or duration to create occurrences
+        if ($schedule->endTime === null && $schedule->duration === null) {
+            return;
+        }
+
         $current = $start;
         $occurrences = 0;
         $repeatCount = $schedule->repeatCount;
-        $duration = $schedule->duration ?? null;
         $interval = self::scheduleInterval($schedule);
         $endDate = $schedule->endDate;
 
         while ($repeatCount === null || $occurrences < $repeatCount) {
-            // Exit condition: endDate is present and reached, or no duration|interval are specified
-            if (
-                ($endDate !== null && $current->greaterThan($endDate)) ||
-                $duration === null
-            ) {
+            // Exit condition: endDate is present and reached
+            if ($endDate !== null && $current->greaterThan($endDate)) {
                 break;
             }
 

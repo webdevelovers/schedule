@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WebDevelovers\Schedule;
 
 use Cake\Chronos\ChronosDate;
+use Cake\Chronos\ChronosTime;
 use DateTimeInterface;
 use JsonException;
 use JsonSerializable;
@@ -238,5 +239,57 @@ class ScheduleAggregate implements JsonSerializable
     public function getSchedules(): array
     {
         return $this->schedules;
+    }
+
+    /** @throws ScheduleException */
+    public function sortedBy(string $field, bool $ascending = true): self
+    {
+        if (! in_array($field, ['startDate', 'endDate', 'startTime', 'endTime'], true)) {
+            throw new ScheduleException(sprintf('Invalid sort field: %s', $field));
+        }
+
+        $sorted = $this->schedules;
+
+        usort($sorted, static function (Schedule $a, Schedule $b) use ($field, $ascending): int {
+            $valueA = match ($field) {
+                'startDate' => $a->startDate,
+                'endDate' => $a->endDate,
+                'startTime' => $a->startTime,
+                'endTime' => $a->endTime,
+            };
+
+            $valueB = match ($field) {
+                'startDate' => $b->startDate,
+                'endDate' => $b->endDate,
+                'startTime' => $b->startTime,
+                'endTime' => $b->endTime,
+            };
+
+            // Handle null values - nulls go to the end
+            if ($valueA === null && $valueB === null) {
+                return 0;
+            }
+
+            if ($valueA === null) {
+                return $ascending ? 1 : -1;
+            }
+
+            if ($valueB === null) {
+                return $ascending ? -1 : 1;
+            }
+
+            // Compare dates/times
+            if ($valueA instanceof ChronosDate) {
+                $comparison = $valueA->lessThan($valueB) ? -1 : ($valueA->greaterThan($valueB) ? 1 : 0);
+            } elseif ($valueA instanceof ChronosTime) {
+                $comparison = $valueA->lessThan($valueB) ? -1 : ($valueA->greaterThan($valueB) ? 1 : 0);
+            } else {
+                $comparison = 0;
+            }
+
+            return $ascending ? $comparison : -$comparison;
+        });
+
+        return new self($sorted);
     }
 }
