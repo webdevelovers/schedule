@@ -42,9 +42,11 @@ readonly class ScheduleExpander
     }
 
     /**
-     * Expands a ScheduleAggregate into all occurrences, sorted by start datetime
+     * Expands a ScheduleAggregate into all occurrences, sorted by start datetime.
+     * Returns a generator for memory efficiency while maintaining global sort order.
+     * Uses k-way merge algorithm. Guarantees unique occurrences.
      *
-     * @return ScheduleOccurrence[]
+     * @return Generator<ScheduleOccurrence>
      *
      * @throws ScheduleExpandException
      */
@@ -52,16 +54,61 @@ readonly class ScheduleExpander
         ScheduleAggregate $aggregate,
         HolidayProviderInterface|null $holidaysProvider = null,
         bool $ascending = true,
-    ): array {
-        $occurrences = iterator_to_array(self::expandAggregate($aggregate, $holidaysProvider), false);
+        bool $unique = true,
+    ): Generator {
+        $generators = [];
+        $values = [];
 
-        usort($occurrences, static function (ScheduleOccurrence $a, ScheduleOccurrence $b) use ($ascending): int {
-            $comparison = $a->start <=> $b->start;
+        // Initialize: create generators and get the first value from each
+        foreach ($aggregate->all() as $schedule) {
+            $generator = self::expand($schedule, $holidaysProvider);
+            if ($generator->valid()) {
+                $generators[] = $generator;
+                $values[] = $generator->current();
+            }
+        }
 
-            return $ascending ? $comparison : -$comparison;
-        });
+        $seen = [];
 
-        return $occurrences;
+        // K-way merge
+        while (count($generators) > 0) {
+            // Find the index of the minimum (or maximum if descending) value
+            $minIndex = 0;
+            for ($i = 1; $i < count($values); $i++) {
+                $comparison = $values[$i]->start <=> $values[$minIndex]->start;
+                if (($ascending && $comparison < 0) || (!$ascending && $comparison > 0)) {
+                    $minIndex = $i;
+                }
+            }
+
+            $current = $values[$minIndex];
+
+            // Check if we've already seen this occurrence
+            $key = self::occurrenceKey($current);
+            if (!$unique || !isset($seen[$key])) {
+                yield $current;
+                if ($unique) {
+                    $seen[$key] = true;
+                }
+            }
+
+            // Advance the generator that produced the minimum
+            $generators[$minIndex]->next();
+
+            // If the generator has more values, update; otherwise remove it
+            if ($generators[$minIndex]->valid()) {
+                $values[$minIndex] = $generators[$minIndex]->current();
+            } else {
+                array_splice($generators, $minIndex, 1);
+                array_splice($values, $minIndex, 1);
+            }
+        }
+    }
+
+    /** Creates a unique key for an occurrence based on start and end datetime */
+    private static function occurrenceKey(ScheduleOccurrence $occurrence): string
+    {
+        return $occurrence->start->format('Y-m-d H:i:s') . '|' . $occurrence->end->format('Y-m-d H:i:s');
     }
 
     /**
