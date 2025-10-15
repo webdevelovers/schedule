@@ -39,7 +39,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
         $this->assertCount(0, $occurrences);
     }
 
@@ -51,7 +51,7 @@ final class ScheduleExpanderTest extends TestCase
             startTime: self::chronosTime('12:00')
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
         $this->assertCount(1, $occurrences);
         $this->assertSame(date_default_timezone_get(), $occurrences[0]->start->getTimezone()->getName());
         $this->assertSame(date_default_timezone_get(), $occurrences[0]->end->getTimezone()->getName());
@@ -67,8 +67,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: 'Europe/Rome'
         );
 
-        $expander = new ScheduleExpander($schedule, $this->holidaysProvider);
-        $occurrences = iterator_to_array($expander->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
         $this->assertCount(1, $occurrences);
         $this->assertSame('Europe/Rome', $occurrences[0]->start->getTimezone()->getName());
         $this->assertSame('Europe/Rome', $occurrences[0]->end->getTimezone()->getName());
@@ -84,7 +83,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(1, $occurrences);
         $this->assertEquals('2024-01-10 15:30', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -100,7 +99,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(1, $occurrences);
         $this->assertEquals('2024-01-10 15:30', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -117,7 +116,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(1, $occurrences);
         $this->assertEquals('2024-01-10 22:00', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -134,7 +133,8 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
+
         $this->assertCount(1, $occurrences);
         $this->assertEquals('2024-01-10 09:15', $occurrences[0]->start->format('Y-m-d H:i'));
         $this->assertEquals('2024-01-10 10:00', $occurrences[0]->end->format('Y-m-d H:i'));
@@ -150,7 +150,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(1, $occurrences);
         $this->assertInstanceOf(\DateInterval::class, $occurrences[0]->duration);
@@ -172,7 +172,8 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
+
         $this->assertCount(1, $occurrences);
         $this->assertEquals('2024-05-10 10:00', $occurrences[0]->start->format('Y-m-d H:i'));
         $this->assertEquals('2024-05-10 10:30', $occurrences[0]->end->format('Y-m-d H:i'));
@@ -186,7 +187,8 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
+
         $this->assertCount(0, $occurrences);
     }
 
@@ -201,7 +203,8 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
+
         $this->assertCount(2, $occurrences);
     }
 
@@ -216,7 +219,8 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
+
         $this->assertCount(3, $occurrences);
         $this->assertEquals('2024-01-01 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
         $this->assertEquals('2024-01-03 09:00', $occurrences[2]->start->format('Y-m-d H:i'));
@@ -233,7 +237,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(2, $occurrences);
         $this->assertEquals('2024-01-01 23:30', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -253,7 +257,8 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
+
         $this->assertCount(3, $occurrences);
         $this->assertEquals('2024-01-01 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
         $this->assertEquals('2024-01-03 09:00', $occurrences[2]->start->format('Y-m-d H:i'));
@@ -271,7 +276,8 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
+
         $this->assertCount(5, $occurrences);
         $this->assertEquals('Monday', $occurrences[0]->start->format('l'));
         $this->assertEquals('Wednesday', $occurrences[1]->start->format('l'));
@@ -292,7 +298,8 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
+
         $this->assertCount(3, $occurrences);
         $this->assertEquals('2024-01-01 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
         $this->assertEquals('2024-01-03 09:00', $occurrences[1]->start->format('Y-m-d H:i'));
@@ -311,7 +318,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(2, $occurrences);
         $this->assertEquals('2024-01-01 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -331,7 +338,8 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
+
         $this->assertCount(3, $occurrences);
 
         foreach ($occurrences as $occurrence) {
@@ -353,9 +361,7 @@ final class ScheduleExpanderTest extends TestCase
 
 
         $schedule = $schedule->withStartDate(self::chronosDate('2024-01-01'))->withEndDate(self::chronosDate('2024-03-31'));
-        $expander = new ScheduleExpander($schedule, $this->holidaysProvider);
-
-        $occurrences = iterator_to_array($expander->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertNotEmpty($occurrences);
 
@@ -384,9 +390,8 @@ final class ScheduleExpanderTest extends TestCase
         );
 
         $schedule = $schedule->withStartDate(self::chronosDate('2024-01-01'))->withEndDate(self::chronosDate('2024-03-31'));
-        $expander = new ScheduleExpander($schedule, $this->holidaysProvider);
 
-        $occurrences = iterator_to_array($expander->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertNotEmpty($occurrences);
 
@@ -414,7 +419,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
         $this->assertCount(0, $occurrences);
     }
 
@@ -430,7 +435,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(2, $occurrences);
         $this->assertEquals('2024-02-01 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -449,11 +454,11 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
         $this->assertCount(0, $occurrences);
     }
 
-    public function testDailySkipHolidayOccurrences(): void
+    public function testHolidayOccurrences(): void
     {
         $holidayProvider = $this->createMock(HolidayProviderInterface::class);
         $holidayProvider
@@ -469,8 +474,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $expander = new ScheduleExpander($schedule, $holidayProvider);
-        $occurrences = iterator_to_array($expander->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $holidayProvider));
         $this->assertCount(3, $occurrences);
 
         foreach ($occurrences as $occurrence) {
@@ -492,7 +496,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(3, $occurrences);
         $this->assertEquals('2024-05-01 08:00', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -511,7 +515,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(5, $occurrences);
         $this->assertEquals('2024-01-03 08:00', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -529,7 +533,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(3, $occurrences);
         $this->assertEquals('2024-03-01 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -548,7 +552,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz,
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(3, $occurrences);
         $this->assertEquals('2024-01-31 18:00', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -567,7 +571,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(3, $occurrences);
         $this->assertEquals('2024-04-10 10:00', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -586,7 +590,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(3, $occurrences);
         $this->assertEquals('2022-02-20 11:00', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -608,7 +612,7 @@ final class ScheduleExpanderTest extends TestCase
             timezone: $this->tz
         );
 
-        $occurrences = iterator_to_array($this->expander($schedule)->expand());
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
         $this->assertCount(2, $occurrences);
         $this->assertEquals('2024-03-04 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
@@ -757,10 +761,5 @@ final class ScheduleExpanderTest extends TestCase
     private static function chronosTime(string $time): ChronosTime
     {
         return new ChronosTime($time);
-    }
-
-    private function expander(Schedule $schedule): ScheduleExpander
-    {
-        return new ScheduleExpander($schedule, $this->holidaysProvider);
     }
 }

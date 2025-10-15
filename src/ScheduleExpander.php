@@ -25,12 +25,6 @@ use function sprintf;
 
 readonly class ScheduleExpander
 {
-    public function __construct(
-        private Schedule $schedule,
-        private HolidayProviderInterface|null $holidaysProvider = null,
-    ) {
-    }
-
     /**
      * Expands a ScheduleAggregate into all occurrences from all schedules
      *
@@ -43,8 +37,7 @@ readonly class ScheduleExpander
         HolidayProviderInterface|null $holidaysProvider = null,
     ): Generator {
         foreach ($aggregate->all() as $schedule) {
-            $expander = new self($schedule, $holidaysProvider);
-            yield from $expander->expand();
+            yield from self::expand($schedule, $holidaysProvider);
         }
     }
 
@@ -76,9 +69,11 @@ readonly class ScheduleExpander
      *
      * @throws ScheduleExpandException
      */
-    public function expand(): Generator
+    public static function expand(
+        Schedule                      $schedule,
+        HolidayProviderInterface|null $holidayProvider = null,
+    ): Generator
     {
-        $schedule = $this->schedule;
         $timezone = self::getTimezone($schedule);
 
         $start = $schedule->startDate;
@@ -87,7 +82,7 @@ readonly class ScheduleExpander
         }
 
         if (! $schedule->isRecurring()) {
-            yield from $this->handleNonRecurring($schedule);
+            yield from self::handleNonRecurring($schedule, $holidayProvider);
 
             return;
         }
@@ -142,7 +137,7 @@ readonly class ScheduleExpander
                 $endDT = $startDT;
             }
 
-            $isHoliday = $this->holidaysProvider && $this->holidaysProvider->isHoliday($current);
+            $isHoliday = $holidayProvider && $holidayProvider->isHoliday($current);
 
             yield new ScheduleOccurrence(
                 start: $startDT,
@@ -216,8 +211,9 @@ readonly class ScheduleExpander
     }
 
     /** @throws ScheduleExpandException */
-    private function handleNonRecurring(
+    private static function handleNonRecurring(
         Schedule $schedule,
+        HolidayProviderInterface|null $holidaysProvider = null,
     ): Generator {
         if (
             $schedule->startDate === null ||
@@ -237,7 +233,7 @@ readonly class ScheduleExpander
         $startDT = self::composeStart($currentDate, $schedule->startTime, $timezone);
         $endDT = self::composeEnd($startDT, $currentDate, $schedule->startTime, $schedule->endTime, $schedule->duration, $timezone) ?? $startDT;
 
-        $isHoliday = $this->holidaysProvider && $this->holidaysProvider->isHoliday($currentDate);
+        $isHoliday = $holidaysProvider && $holidaysProvider->isHoliday($currentDate);
 
         yield new ScheduleOccurrence($startDT, $endDT, $timezone, $isHoliday);
     }
