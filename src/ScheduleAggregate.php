@@ -15,10 +15,12 @@ use WebDevelovers\Schedule\Exception\ScheduleException;
 use function array_map;
 use function array_push;
 use function array_values;
+use function in_array;
 use function is_array;
 use function json_decode;
 use function json_encode;
 use function sprintf;
+use function usort;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -61,6 +63,7 @@ class ScheduleAggregate implements JsonSerializable
      * Creates a ScheduleAggregate from an array representation
      *
      * @param array<string,mixed> $data
+     *
      * @throws ScheduleException
      */
     public static function fromArray(array $data): self
@@ -89,12 +92,17 @@ class ScheduleAggregate implements JsonSerializable
         }
     }
 
+    /** @return array<string,mixed> */
     public function __serialize(): array
     {
         return $this->toArray();
     }
 
-    /** @throws ScheduleException */
+    /**
+     * @param array<string,mixed> $data
+     *
+     * @throws ScheduleException
+     */
     public function __unserialize(array $data): void
     {
         $instance = self::fromArray($data);
@@ -236,6 +244,7 @@ class ScheduleAggregate implements JsonSerializable
         }
     }
 
+    /** @return Schedule[] */
     public function getSchedules(): array
     {
         return $this->schedules;
@@ -279,9 +288,9 @@ class ScheduleAggregate implements JsonSerializable
             }
 
             // Compare dates/times
-            if ($valueA instanceof ChronosDate) {
+            if ($valueA instanceof ChronosDate && $valueB instanceof ChronosDate) {
                 $comparison = $valueA->lessThan($valueB) ? -1 : ($valueA->greaterThan($valueB) ? 1 : 0);
-            } elseif ($valueA instanceof ChronosTime) {
+            } elseif ($valueA instanceof ChronosTime && $valueB instanceof ChronosTime) {
                 $comparison = $valueA->lessThan($valueB) ? -1 : ($valueA->greaterThan($valueB) ? 1 : 0);
             } else {
                 $comparison = 0;

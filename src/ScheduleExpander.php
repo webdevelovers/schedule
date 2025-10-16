@@ -7,7 +7,6 @@ namespace WebDevelovers\Schedule;
 use Cake\Chronos\ChronosDate;
 use Cake\Chronos\ChronosTime;
 use DateInterval;
-use DateInvalidTimeZoneException;
 use DateMalformedIntervalStringException;
 use DateMalformedStringException;
 use DateTimeImmutable;
@@ -18,8 +17,9 @@ use WebDevelovers\Schedule\Enum\Month;
 use WebDevelovers\Schedule\Exception\ScheduleExpandException;
 use WebDevelovers\Schedule\Holiday\HolidayProviderInterface;
 
+use function array_splice;
 use function ceil;
-use function date_default_timezone_get;
+use function count;
 use function in_array;
 use function sprintf;
 
@@ -62,10 +62,12 @@ readonly class ScheduleExpander
         // Initialize: create generators and get the first value from each
         foreach ($aggregate->all() as $schedule) {
             $generator = self::expand($schedule, $holidaysProvider);
-            if ($generator->valid()) {
-                $generators[] = $generator;
-                $values[] = $generator->current();
+            if (! $generator->valid()) {
+                continue;
             }
+
+            $generators[] = $generator;
+            $values[] = $generator->current();
         }
 
         $seen = [];
@@ -76,17 +78,20 @@ readonly class ScheduleExpander
             $minIndex = 0;
             for ($i = 1; $i < count($values); $i++) {
                 $comparison = $values[$i]->start <=> $values[$minIndex]->start;
-                if (($ascending && $comparison < 0) || (!$ascending && $comparison > 0)) {
-                    $minIndex = $i;
+                if ((! $ascending || $comparison >= 0) && ($ascending || $comparison <= 0)) {
+                    continue;
                 }
+
+                $minIndex = $i;
             }
 
             $current = $values[$minIndex];
 
             // Check if we've already seen this occurrence
             $key = self::occurrenceKey($current);
-            if (!$unique || !isset($seen[$key])) {
+            if (! $unique || ! isset($seen[$key])) {
                 yield $current;
+
                 if ($unique) {
                     $seen[$key] = true;
                 }
@@ -105,23 +110,16 @@ readonly class ScheduleExpander
         }
     }
 
-    /** Creates a unique key for an occurrence based on start and end datetime */
-    private static function occurrenceKey(ScheduleOccurrence $occurrence): string
-    {
-        return $occurrence->start->format('Y-m-d H:i:s') . '|' . $occurrence->end->format('Y-m-d H:i:s');
-    }
-
     /**
      * @return Generator<ScheduleOccurrence>
      *
      * @throws ScheduleExpandException
      */
     public static function expand(
-        Schedule                      $schedule,
+        Schedule $schedule,
         HolidayProviderInterface|null $holidayProvider = null,
-    ): Generator
-    {
-        $timezone = self::getTimezone($schedule);
+    ): Generator {
+        $timezone = $schedule->timezone;
 
         $start = $schedule->startDate;
         if (! $start) {
@@ -269,12 +267,7 @@ readonly class ScheduleExpander
             return;
         }
 
-        try {
-            $timezone = $schedule->timezone ?? new DateTimeZone(date_default_timezone_get());
-        } catch (DateInvalidTimeZoneException $e) {
-            throw new ScheduleExpandException($e->getMessage(), $e->getCode(), $e);
-        }
-
+        $timezone = $schedule->timezone;
         $currentDate = $schedule->startDate;
 
         $startDT = self::composeStart($currentDate, $schedule->startTime, $timezone);
@@ -337,16 +330,6 @@ readonly class ScheduleExpander
     }
 
     /** @throws ScheduleExpandException */
-    private static function getTimezone(Schedule $schedule): DateTimeZone
-    {
-        try {
-            return $schedule->timezone ?? new DateTimeZone(date_default_timezone_get());
-        } catch (DateInvalidTimeZoneException $exception) {
-            throw new ScheduleExpandException($exception->getMessage(), $exception->getCode(), $exception);
-        }
-    }
-
-    /** @throws ScheduleExpandException */
     private static function scheduleInterval(Schedule $schedule): DateInterval
     {
         try {
@@ -354,5 +337,11 @@ readonly class ScheduleExpander
         } catch (DateMalformedIntervalStringException $e) {
             throw new ScheduleExpandException($e->getMessage(), $e->getCode(), $e);
         }
+    }
+
+    /** Creates a unique key for an occurrence based on start and end datetime */
+    private static function occurrenceKey(ScheduleOccurrence $occurrence): string
+    {
+        return $occurrence->start->format('Y-m-d H:i:s') . '|' . $occurrence->end->format('Y-m-d H:i:s');
     }
 }

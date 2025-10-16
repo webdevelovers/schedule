@@ -44,36 +44,6 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertCount(0, $occurrences);
     }
 
-    public function testUsesDefaultTimezoneWhenNotSpecified(): void
-    {
-        $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::NONE,
-            startDate: self::chronosDate('2024-01-10'),
-            startTime: self::chronosTime('12:00')
-        );
-
-        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
-        $this->assertCount(1, $occurrences);
-        $this->assertSame(date_default_timezone_get(), $occurrences[0]->start->getTimezone()->getName());
-        $this->assertSame(date_default_timezone_get(), $occurrences[0]->end->getTimezone()->getName());
-    }
-
-    public function testUsesProvidedTimezone(): void
-    {
-        $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::NONE,
-            startDate: self::chronosDate('2024-01-10'),
-            startTime: self::chronosTime('12:00'),
-            endTimeOrDuration: 'PT1H',
-            timezone: 'Europe/Rome'
-        );
-
-        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
-        $this->assertCount(1, $occurrences);
-        $this->assertSame('Europe/Rome', $occurrences[0]->start->getTimezone()->getName());
-        $this->assertSame('Europe/Rome', $occurrences[0]->end->getTimezone()->getName());
-    }
-
     public function testNonRecurring(): void
     {
         $schedule = new Schedule(
@@ -91,6 +61,7 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2024-01-10 16:30', $occurrences[0]->end->format('Y-m-d H:i'));
     }
 
+    //TODO: review before 1.0
     public function testNonRecurringWithStartTimeNoEndOrDuration(): void
     {
         $schedule = new Schedule(
@@ -162,6 +133,7 @@ final class ScheduleExpanderTest extends TestCase
         );
     }
 
+    //TODO: review before 1.0
     public function testNonRecurringIgnoresExceptDates(): void
     {
         $schedule = new Schedule(
@@ -180,6 +152,7 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2024-05-10 10:30', $occurrences[0]->end->format('Y-m-d H:i'));
     }
 
+    //TODO: review before 1.0
     public function testDailyWithoutDurationProducesNoOccurrences(): void
     {
         $schedule = new Schedule(
@@ -360,7 +333,6 @@ final class ScheduleExpanderTest extends TestCase
             byMonthWeek: [-1],
         );
 
-
         $schedule = $schedule->withStartDate(self::chronosDate('2024-01-01'))->withEndDate(self::chronosDate('2024-03-31'));
         $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
 
@@ -443,6 +415,7 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2024-02-02 09:00', $occurrences[1]->start->format('Y-m-d H:i'));
     }
 
+    //TODO: review before 1.0
     public function testDailyByMonthDayNegativeNotSupportedProducesNoOccurrences(): void
     {
         $schedule = new Schedule(
@@ -599,6 +572,8 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2024-02-20 11:00', $occurrences[2]->start->format('Y-m-d H:i'));
     }
 
+    //TODO: test the remaining enum values before 1.0
+
     public function testCombinedFiltersByDayByMonthByMonthDay(): void
     {
         $schedule = new Schedule(
@@ -622,10 +597,6 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('Monday', $occurrences[1]->start->format('l'));
     }
 
-    /**
-     * @throws ScheduleExpandException
-     * @throws ScheduleException
-     */
     public function testExpandAggregateWithMultipleSchedules(): void
     {
         $s1 = new Schedule(
@@ -653,7 +624,6 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertCount(4, $occurrences);
     }
 
-    /** @throws ScheduleException */
     public function testExpandAggregateSorted(): void
     {
         $s1 = new Schedule(
@@ -691,7 +661,6 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2025-01-04 08:00', $occurrences[5]->start->format('Y-m-d H:i'));
     }
 
-    /** @throws ScheduleException */
     public function testExpandAggregateSortedDescending(): void
     {
         $s1 = new Schedule(
@@ -721,7 +690,6 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2025-01-05 09:00', $occurrences[1]->start->format('Y-m-d H:i'));
     }
 
-    /** @throws ScheduleException */
     public function testExpandAggregateSortedIsActuallyLazy(): void
     {
         $s1 = new Schedule(
@@ -753,7 +721,6 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals(5, $count);
     }
 
-    /** @throws ScheduleException */
     public function testExpandAggregateSortedRemovesDuplicates(): void
     {
         // Two schedules that produce the same occurrences
@@ -784,7 +751,6 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2025-01-10 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
     }
 
-    /** @throws ScheduleException */
     public function testExpandAggregateSortedKeepsDuplicatesWhenDisabled(): void
     {
         // Two schedules that produce the same occurrences
@@ -814,7 +780,6 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertCount(2, $occurrences); // Both occurrences kept
     }
 
-    /** @throws ScheduleException */
     public function testExpandAggregateSortedRemovesDuplicatesFromRecurringSchedules(): void
     {
         // Two daily schedules with overlapping dates

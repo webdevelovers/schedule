@@ -4,7 +4,6 @@ namespace WebDevelovers\Schedule\Tests;
 
 use Cake\Chronos\ChronosDate;
 use Cake\Chronos\ChronosTime;
-use JsonException;
 use PHPUnit\Framework\TestCase;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
 use WebDevelovers\Schedule\Enum\Month;
@@ -20,7 +19,6 @@ class ScheduleTest extends TestCase
         $this->assertEquals(ScheduleInterval::DAILY, $schedule->repeatInterval);
     }
 
-    /** @throws ScheduleException */
     public function testValidScheduleDoesNotThrow()
     {
         new Schedule(
@@ -69,7 +67,6 @@ class ScheduleTest extends TestCase
         $this->assertFalse($notRecurring->isRecurring());
     }
 
-    /** @throws ScheduleException */
     public function testDurationIsCalculatedWithStartTimeEndTimeAsChronosTime()
     {
         $startTime = new ChronosTime('09:00');
@@ -86,7 +83,6 @@ class ScheduleTest extends TestCase
         $this->assertEquals('PT02H30M00S', $schedule->duration->format('PT%HH%IM%SS'));;
     }
 
-    /** @throws ScheduleException */
     public function testDurationIsCalculatedWithStartTimeEndTimeAsInterval()
     {
         $startTime = new ChronosTime('09:00');
@@ -103,7 +99,6 @@ class ScheduleTest extends TestCase
         $this->assertEquals('PT02H30M00S', $schedule->duration->format('PT%HH%IM%SS'));;
     }
 
-    /** @throws ScheduleException */
     public function testDurationIsCalculatedWithStartTimeEndTimeAsString()
     {
         $startTime = new ChronosTime('09:00');
@@ -120,7 +115,6 @@ class ScheduleTest extends TestCase
         $this->assertEquals('PT02H30M00S', $schedule->duration->format('PT%HH%IM%SS'));;
     }
 
-    /** @throws ScheduleException */
     public function testDurationIsNotCalculatedWithoutEndTime()
     {
         $startTime = new ChronosTime('09:00');
@@ -132,14 +126,13 @@ class ScheduleTest extends TestCase
             startTime: $startTime,
         );
 
-        $this->assertEquals(null, $schedule->duration);;
+        $this->assertEquals(null, $schedule->duration);
     }
-
 
     public function testInvalidDurationString()
     {
         $this->expectException(ScheduleException::class);
-        $schedule = new Schedule(
+        new Schedule(
             repeatInterval: ScheduleInterval::DAILY,
             endTimeOrDuration: 'XXX',
         );
@@ -154,7 +147,6 @@ class ScheduleTest extends TestCase
         );
     }
 
-    /** @throws ScheduleException */
     public function testEndDateBeforeStartDate()
     {
         $this->expectException(ScheduleException::class);
@@ -201,7 +193,6 @@ class ScheduleTest extends TestCase
         );
     }
 
-    /** @throws ScheduleException */
     public function testByMonthValidMultipleDoesNotThrow()
     {
         new Schedule(
@@ -294,7 +285,6 @@ class ScheduleTest extends TestCase
         );
     }
 
-    /** @throws ScheduleException */
     public function testByMonthWeekBoundaryValuesAccepted()
     {
         // Limiti ammessi: 6 e -6
@@ -311,10 +301,8 @@ class ScheduleTest extends TestCase
         $this->expectNotToPerformAssertions();
     }
 
-    /** @throws ScheduleException */
     public function testByMonthWeekMultipleValuesAccepted()
     {
-        // Combinazione di settimane: prima e ultima del mese
         new Schedule(
             repeatInterval: ScheduleInterval::DAILY,
             byMonthWeek: [1, -1]
@@ -344,7 +332,6 @@ class ScheduleTest extends TestCase
         );
     }
 
-    /** @throws ScheduleException */
     public function testDoesNotThrowWithExceptDatesOnBoundaries()
     {
         new Schedule(
@@ -360,7 +347,6 @@ class ScheduleTest extends TestCase
         $this->expectNotToPerformAssertions();
     }
 
-    /** @throws ScheduleException */
     public function testExceptDatesWithOnlyStartDateDoesNotValidateRange()
     {
         new Schedule(
@@ -374,7 +360,6 @@ class ScheduleTest extends TestCase
         $this->expectNotToPerformAssertions();
     }
 
-    /** @throws ScheduleException */
     public function testExceptDatesWithOnlyEndDateDoesNotValidateRange()
     {
         new Schedule(
@@ -403,7 +388,6 @@ class ScheduleTest extends TestCase
         );
     }
 
-    /** @throws ScheduleException */
     public function testAsArraySerialization()
     {
         $start = new ChronosDate('2024-08-01');
@@ -478,6 +462,44 @@ class ScheduleTest extends TestCase
         $this->assertNull($array['repeatCount']);
 
         $this->assertSame(date_default_timezone_get(), $array['timezone']);
+    }
+
+    public function testToArrayFromArrayRoundTrip(): void
+    {
+        $start = new ChronosDate('2024-08-01');
+        $end = new ChronosDate('2024-08-31');
+        $startTime = new ChronosTime('09:00');
+        $endTime = new ChronosTime('11:00');
+        $except = [
+            new ChronosDate('2024-08-15'),
+            new ChronosDate('2024-08-18')
+        ];
+
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: $start,
+            endDate: $end,
+            startTime: $startTime,
+            endTimeOrDuration: $endTime,
+            repeatCount: 10,
+            byDay: [DayOfWeek::MONDAY],
+            byMonthDay: [1, 15],
+            byMonth: [Month::AUGUST],
+            byMonthWeek: [1],
+            exceptDates: $except,
+            timezone: 'Europe/Rome'
+        );
+
+        $array = $schedule->toArray();
+        $restored = Schedule::fromArray($array);
+
+        $this->assertEquals($schedule->toArray(), $restored->toArray());
+        $this->assertSame($schedule->repeatInterval, $restored->repeatInterval);
+        $this->assertEquals($schedule->startDate, $restored->startDate);
+        $this->assertEquals($schedule->endDate, $restored->endDate);
+        $this->assertEquals($schedule->startTime, $restored->startTime);
+        $this->assertEquals($schedule->endTime, $restored->endTime);
+        $this->assertSame($schedule->timezone->getName(), $restored->timezone->getName());
     }
 
     public function testFromJsonRoundTrip(): void
@@ -565,46 +587,6 @@ class ScheduleTest extends TestCase
         Schedule::fromJson('{not valid json}');
     }
 
-    /** @throws ScheduleException */
-    public function testToArrayFromArrayRoundTrip(): void
-    {
-        $start = new ChronosDate('2024-08-01');
-        $end = new ChronosDate('2024-08-31');
-        $startTime = new ChronosTime('09:00');
-        $endTime = new ChronosTime('11:00');
-        $except = [
-            new ChronosDate('2024-08-15'),
-            new ChronosDate('2024-08-18')
-        ];
-
-        $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::DAILY,
-            startDate: $start,
-            endDate: $end,
-            startTime: $startTime,
-            endTimeOrDuration: $endTime,
-            repeatCount: 10,
-            byDay: [DayOfWeek::MONDAY],
-            byMonthDay: [1, 15],
-            byMonth: [Month::AUGUST],
-            byMonthWeek: [1],
-            exceptDates: $except,
-            timezone: 'Europe/Rome'
-        );
-
-        $array = $schedule->toArray();
-        $restored = Schedule::fromArray($array);
-
-        $this->assertEquals($schedule->toArray(), $restored->toArray());
-        $this->assertSame($schedule->repeatInterval, $restored->repeatInterval);
-        $this->assertEquals($schedule->startDate, $restored->startDate);
-        $this->assertEquals($schedule->endDate, $restored->endDate);
-        $this->assertEquals($schedule->startTime, $restored->startTime);
-        $this->assertEquals($schedule->endTime, $restored->endTime);
-        $this->assertSame($schedule->timezone->getName(), $restored->timezone->getName());
-    }
-
-    /** @throws ScheduleException */
     public function testSerializeUnserializeRoundTrip(): void
     {
         $schedule = new Schedule(
@@ -634,7 +616,6 @@ class ScheduleTest extends TestCase
         $this->assertEquals($schedule->endDate, $unserialized->endDate);
     }
 
-    /** @throws JsonException */
     public function testToJsonMethod(): void
     {
         $schedule = new Schedule(
@@ -672,7 +653,6 @@ class ScheduleTest extends TestCase
         ]);
     }
 
-    /** @throws ScheduleException */
     public function testFromArrayWithNullableFields(): void
     {
         $array = [

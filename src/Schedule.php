@@ -12,7 +12,6 @@ use DateTimeZone;
 use InvalidArgumentException;
 use JsonException;
 use JsonSerializable;
-use Serializable;
 use Throwable;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
 use WebDevelovers\Schedule\Enum\Month;
@@ -27,6 +26,7 @@ use function is_array;
 use function is_int;
 use function is_string;
 use function json_decode;
+use function json_encode;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -98,6 +98,7 @@ class Schedule implements JsonSerializable
 
     /**
      * Converts the Schedule to an array representation
+     *
      * @return array<string,mixed>
      */
     public function toArray(): array
@@ -115,7 +116,7 @@ class Schedule implements JsonSerializable
             'byMonthDay' => $this->byMonthDay,
             'byMonth' => $this->byMonth ? array_map(static fn (Month $d) => $d->value, $this->byMonth) : null,
             'byMonthWeek' => $this->byMonthWeek,
-            'exceptDates' => array_map(static fn(ChronosDate $chronosDate) => $chronosDate->format('Y/m/d'), $this->exceptDates)
+            'exceptDates' => array_map(static fn (ChronosDate $chronosDate) => $chronosDate->format('Y/m/d'), $this->exceptDates),
         ];
     }
 
@@ -123,6 +124,7 @@ class Schedule implements JsonSerializable
      * Creates a Schedule instance from an array representation
      *
      * @param array<string,mixed> $data
+     *
      * @throws ScheduleException
      */
     public static function fromArray(array $data): self
@@ -243,12 +245,17 @@ class Schedule implements JsonSerializable
         }
     }
 
+    /** @return array<string,mixed> */
     public function __serialize(): array
     {
         return $this->toArray();
     }
 
-    /** @throws ScheduleException */
+    /**
+     * @param array<string,mixed> $data
+     *
+     * @throws ScheduleException
+     */
     public function __unserialize(array $data): void
     {
         $instance = self::fromArray($data);

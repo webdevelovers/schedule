@@ -14,7 +14,6 @@ use WebDevelovers\Schedule\ScheduleAggregate;
 
 class ScheduleAggregateTest extends TestCase
 {
-    /** @throws ScheduleException */
     private function makeSchedule(
         string $startDate = '2025-01-01',
         ?string $endDate = '2025-01-31',
@@ -30,8 +29,7 @@ class ScheduleAggregateTest extends TestCase
         );
     }
 
-    /** @throws ScheduleException */
-    public function testConstructWithSchedulesAndAll(): void
+    public function testConstructWithSchedules(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
         $s2 = $this->makeSchedule('2025-01-11', '2025-01-20');
@@ -51,7 +49,6 @@ class ScheduleAggregateTest extends TestCase
         new ScheduleAggregate([new stdClass()]);
     }
 
-    /** @throws ScheduleException */
     public function testWithAddedReturnsNewInstanceAndPreservesOriginal(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -66,7 +63,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertSame($s2, $agg2->all()[1]);
     }
 
-    /** @throws ScheduleException */
     public function testWithSchedulesReplacesAll(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -82,7 +78,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertSame($s2, $agg2->all()[0]);
     }
 
-    /** @throws ScheduleException */
     public function testGetBoundsWithMixedNulls(): void
     {
         $s1 = $this->makeSchedule('2025-03-05', '2025-03-20');
@@ -97,7 +92,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertSame('2025-04-10', $maxEnd?->toDateString());
     }
 
-    /** @throws ScheduleException */
     public function testGetBoundsAllOpenEnds(): void
     {
         $s1 = $this->makeSchedule('2025-01-10', null);
@@ -110,7 +104,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertNull($maxEnd);
     }
 
-    /** @throws ScheduleException */
     public function testIntersectingFiltersCorrectly(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -125,7 +118,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertSame([$s1, $s2], $subset->all());
     }
 
-    /** @throws ScheduleException */
     public function testIntersectingWithOpenSchedule(): void
     {
         $sOpen = $this->makeSchedule('2025-01-01', null);
@@ -146,7 +138,6 @@ class ScheduleAggregateTest extends TestCase
         $agg->intersecting(new ChronosDate('2025-02-10'), new ChronosDate('2025-02-01'));
     }
 
-    /** @throws ScheduleException */
     public function testMergeAggregates(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -165,7 +156,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertCount(2, $a2->all());
     }
 
-    /** @throws ScheduleException */
     public function testJsonSerializeIncludesBoundsAndSchedules(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -182,7 +172,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertSame('2025-01-25T00:00:00+00:00', $arr['bounds']['endDate']);
     }
 
-    /** @throws ScheduleException */
     public function testFromJsonRoundTrip(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -217,7 +206,6 @@ class ScheduleAggregateTest extends TestCase
         ScheduleAggregate::fromJson('{"schedules":[123]}');
     }
 
-    /** @throws ScheduleException */
     public function testIntersectingNoOverlapReturnsEmpty(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -229,7 +217,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertCount(0, $subset->all());
     }
 
-    /** @throws ScheduleException */
     public function testToArrayFromArrayRoundTrip(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -245,7 +232,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertEquals($agg->toArray(), $restored->toArray());
     }
 
-    /** @throws ScheduleException */
     public function testSerializeUnserializeRoundTrip(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -263,7 +249,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertEquals($agg->toArray(), $unserialized->toArray());
     }
 
-    /** @throws JsonException */
     public function testToJsonMethod(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -304,7 +289,6 @@ class ScheduleAggregateTest extends TestCase
         ]);
     }
 
-    /** @throws ScheduleException */
     public function testFromArrayWithEmptySchedules(): void
     {
         $agg = ScheduleAggregate::fromArray([
@@ -315,7 +299,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertCount(0, $agg->all());
     }
 
-    /** @throws ScheduleException */
     public function testJsonSerializeMatchesToArray(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -329,7 +312,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertEquals($toArray, $jsonSerialized);
     }
 
-    /** @throws ScheduleException */
     public function testSortedByStartDateAscending(): void
     {
         $s1 = $this->makeSchedule('2025-03-01', '2025-03-10');
@@ -350,7 +332,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertSame('2025-03-01', $agg->all()[0]->startDate?->format('Y-m-d'));
     }
 
-    /** @throws ScheduleException */
     public function testSortedByStartDateDescending(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-01-10');
@@ -368,7 +349,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertSame(['2025-03-01', '2025-02-01', '2025-01-01'], $dates);
     }
 
-    /** @throws ScheduleException */
     public function testSortedByStartDateWithNulls(): void
     {
         $s1 = $this->makeSchedule('2025-02-01', '2025-02-10');
@@ -389,7 +369,6 @@ class ScheduleAggregateTest extends TestCase
         $this->assertNull($all[2]->startDate); // Null goes to the end
     }
 
-    /** @throws ScheduleException */
     public function testSortedByEndDate(): void
     {
         $s1 = $this->makeSchedule('2025-01-01', '2025-03-31');

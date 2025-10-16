@@ -7,12 +7,14 @@ namespace WebDevelovers\Schedule\Humanizer;
 use Cake\Chronos\ChronosDate;
 use DateInterval;
 use DateTimeInterface;
+use InvalidArgumentException;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
 use WebDevelovers\Schedule\Enum\Month;
 use WebDevelovers\Schedule\Enum\ScheduleInterval;
 use WebDevelovers\Schedule\Schedule;
 
 use function array_map;
+use function assert;
 use function count;
 use function implode;
 use function strtolower;
@@ -55,6 +57,7 @@ readonly class ScheduleHumanizer
         return implode(' | ', $this->humanize());
     }
 
+    /** @param array<string,string> $parts */
     private function humanizeFromToDate(array &$parts): void
     {
         if ($this->schedule->startDate) {
@@ -77,6 +80,7 @@ readonly class ScheduleHumanizer
         }
     }
 
+    /** @param array<string,string> $parts */
     private function humanizeFromToTime(array &$parts): void
     {
         $schedule = $this->schedule;
@@ -84,6 +88,8 @@ readonly class ScheduleHumanizer
         if ($schedule->startTime) {
             if ($schedule->endTime) {
                 $interval = $schedule->duration;
+                assert($interval instanceof DateInterval);
+
                 $durationStr = $this->humanizeDuration($interval);
 
                 $parts['time-interval'] = $this->translator->trans(
@@ -177,6 +183,7 @@ readonly class ScheduleHumanizer
         return implode(' ', $parts);
     }
 
+    /** @param array<string,string> $parts */
     private function humanizeRepeatCount(array &$parts): void
     {
         if (! $this->schedule->repeatCount) {
@@ -188,6 +195,7 @@ readonly class ScheduleHumanizer
         ], domain: 'schedule', locale: $this->locale);
     }
 
+    /** @param array<string,string> $parts */
     private function humanizeInterval(array &$parts): void
     {
         $schedule = $this->schedule;
@@ -203,6 +211,7 @@ readonly class ScheduleHumanizer
         );
     }
 
+    /** @param array<string,string> $parts */
     private function humanizeFilters(array &$parts): void
     {
         $schedule = $this->schedule;
@@ -349,6 +358,7 @@ readonly class ScheduleHumanizer
             -4 => 'schedule.month_week.fourth_to_last',
             -5 => 'schedule.month_week.fifth_to_last',
             -6 => 'schedule.month_week.sixth_to_last',
+            default => throw new InvalidArgumentException('Invalid month week: ' . $monthWeek),
         };
     }
 
@@ -360,16 +370,5 @@ readonly class ScheduleHumanizer
     private function formatTime(DateTimeInterface $date): string
     {
         return $date->format('H:i');
-    }
-
-    private function translateInterval(ScheduleInterval $frequency): string
-    {
-        return match ($frequency) {
-            ScheduleInterval::EVERY_YEAR => $this->translator->trans('schedule.interval.years', ['%count%' => 1], domain: 'schedule', locale: $this->locale),
-            ScheduleInterval::EVERY_MONTH => $this->translator->trans('schedule.interval.months', ['%count%' => 1], domain: 'schedule', locale: $this->locale),
-            ScheduleInterval::EVERY_WEEK => $this->translator->trans('schedule.interval.days', ['%count%' => 7], domain: 'schedule', locale: $this->locale),
-            ScheduleInterval::DAILY => $this->translator->trans('schedule.interval.days', ['%count%' => 1], domain: 'schedule', locale: $this->locale),
-            default => $frequency->value,
-        };
     }
 }
