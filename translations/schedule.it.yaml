@@ -1,25 +1,34 @@
-# DayOfWeeks
-schedule.day.monday: Lunedì
-schedule.day.tuesday: Martedì
-schedule.day.wednesday: Mercoledì
-schedule.day.thursday: Giovedì
-schedule.day.friday: Venerdì
-schedule.day.saturday: Sabato
-schedule.day.sunday: Domenica
+# DayOfWeek
+schedule.day.monday: lunedì
+schedule.day.tuesday: martedì
+schedule.day.wednesday: mercoledì
+schedule.day.thursday: giovedì
+schedule.day.friday: venerdì
+schedule.day.saturday: sabato
+schedule.day.sunday: domenica
 
-# Months
-schedule.month.january: Gennaio
-schedule.month.february: Febbraio
-schedule.month.march: Marzo
-schedule.month.april: Aprile
-schedule.month.may: Maggio
-schedule.month.june: Giugno
-schedule.month.july: Luglio
-schedule.month.august: Agosto
-schedule.month.september: Settembre
-schedule.month.october: Ottobre
-schedule.month.november: Novembre
-schedule.month.december: Dicembre
+# Month
+schedule.month.january: gennaio
+schedule.month.february: febbraio
+schedule.month.march: marzo
+schedule.month.april: aprile
+schedule.month.may: maggio
+schedule.month.june: giugno
+schedule.month.july: luglio
+schedule.month.august: agosto
+schedule.month.september: settembre
+schedule.month.october: ottobre
+schedule.month.november: novembre
+schedule.month.december: dicembre
+
+# UnitOfTime
+schedule.unit_of_time.seconds: secondi
+schedule.unit_of_time.minutes: minuti
+schedule.unit_of_time.hours: ore
+schedule.unit_of_time.days: giorni
+schedule.unit_of_time.weeks: settimane
+schedule.unit_of_time.months: mesi
+schedule.unit_of_time.years: anni
 
 # Start/End Date, Time, Repeat Count
 schedule.from_date: 'dal %start%'
@@ -46,14 +55,14 @@ schedule.interval.minutes: '%count% minuti'
 schedule.frequency.none: nessuna ripetizione
 schedule.frequency.daily: ripetizione giornaliera
 schedule.frequency.every_week: ogni 7 giorni
-schedule.frequency.every_two_weeks: ogni due settimane
-schedule.frequency.every_three_weeks: ogni tre settimane
-schedule.frequency.every_four_weeks: ogni quattro settimane
+schedule.frequency.every_two_weeks: ogni 14 giorni
+schedule.frequency.every_three_weeks: ogni 21 giorni
+schedule.frequency.every_four_weeks: ogni 28 giorni
 schedule.frequency.every_month: ogni 30 giorni
-schedule.frequency.every_two_months: ogni due mesi
-schedule.frequency.every_three_months: ogni tre mesi
-schedule.frequency.every_four_months: ogni quattro mesi
-schedule.frequency.every_six_months: ogni sei mesi
+schedule.frequency.every_two_months: ogni 60 giorni
+schedule.frequency.every_three_months: ogni 90 giorni
+schedule.frequency.every_four_months: ogni 120 giorni
+schedule.frequency.every_six_months: ogni 180 giorni
 schedule.frequency.every_year: ogni 365 giorni
 
 # MonthWeek
@@ -64,11 +73,11 @@ schedule.month_week.fourth: 'quarta'
 schedule.month_week.fifth: 'quinta'
 schedule.month_week.sixth: 'sesta'
 schedule.month_week.last: 'ultima'
-schedule.month_week.second_to_last: 'penultima'
-schedule.month_week.third_to_last: 'terzultima'
-schedule.month_week.fourth_to_last: 'quartultima'
-schedule.month_week.fifth_to_last: 'quintultima'
-schedule.month_week.sixth_to_last: 'sestultima'
+schedule.month_week.second_last: 'penultima'
+schedule.month_week.third_last: 'terzultima'
+schedule.month_week.fourth_last: 'quartultima'
+schedule.month_week.fifth_last: 'quintultima'
+schedule.month_week.sixth_last: 'sestultima'
 
 # Filters
 schedule.every_month_days: 'il %days% del mese'

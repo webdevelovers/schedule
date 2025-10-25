@@ -8,6 +8,7 @@ use Cake\Chronos\ChronosDate;
 use Cake\Chronos\ChronosTime;
 use DateInterval;
 use DateInvalidTimeZoneException;
+use DateMalformedIntervalStringException;
 use DateTimeZone;
 use InvalidArgumentException;
 use JsonException;
@@ -313,7 +314,7 @@ class Schedule implements JsonSerializable
         ChronosTime|DateInterval|string|null $endTimeOrDuration,
     ): void {
         try {
-            [$this->endTime, $this->duration] = DateUtils::endTimeAndDurationFromParam($endTimeOrDuration, $this->startTime);
+            [$this->endTime, $this->duration] = self::endTimeAndDurationFromParam($endTimeOrDuration, $this->startTime);
         } catch (InvalidArgumentException $e) {
             throw new ScheduleException($e->getMessage(), $e->getCode(), $e);
         }
@@ -478,5 +479,85 @@ class Schedule implements JsonSerializable
                 throw new ScheduleException('Some exceptDates are outside the range startDate/endDate.');
             }
         }
+    }
+
+    /**
+     * @return array{0: ChronosTime|null, 1: DateInterval|null}
+     *
+     * @throws InvalidArgumentException
+     */
+    private static function endTimeAndDurationFromParam(ChronosTime|DateInterval|string|null $endTimeOrDuration, ChronosTime|null $startTime): array
+    {
+        if ($endTimeOrDuration === null) {
+            return [null, null];
+        }
+
+        if ($endTimeOrDuration instanceof DateInterval) {
+            if (
+                $endTimeOrDuration->y === 0 &&
+                $endTimeOrDuration->m === 0 &&
+                $endTimeOrDuration->d === 0 &&
+                $endTimeOrDuration->h === 0 &&
+                $endTimeOrDuration->i === 0 &&
+                $endTimeOrDuration->s === 0
+            ) {
+                throw new InvalidArgumentException('Duration interval cannot be zero.');
+            }
+
+            if ($startTime === null) {
+                throw new InvalidArgumentException('startTime is required when endTimeOrDuration is provided as DateInterval.');
+            }
+
+            $startTimeAsDate = $startTime->toDateTimeImmutable();
+            $endTime = new ChronosTime($startTimeAsDate->add($endTimeOrDuration));
+
+            return [$endTime, $endTimeOrDuration];
+        }
+
+        if ($endTimeOrDuration instanceof ChronosTime) {
+            $endTimeAsDate = $endTimeOrDuration->toDateTimeImmutable();
+            if ($startTime === null) {
+                return [$endTimeOrDuration, null];
+            }
+
+            if ($endTimeOrDuration->lessThan($startTime)) {
+                $endTimeAsDate = $endTimeAsDate->add(new DateInterval('P1D'));
+            }
+
+            $startTimeAsDate = $startTime->toDateTimeImmutable();
+            $duration = $startTimeAsDate->diff($endTimeAsDate);
+
+            return [$endTimeOrDuration, $duration];
+        }
+
+        if (strlen($endTimeOrDuration) > 0) {
+            try {
+                $duration = new DateInterval($endTimeOrDuration);
+                if (
+                    $duration->y === 0 &&
+                    $duration->m === 0 &&
+                    $duration->d === 0 &&
+                    $duration->h === 0 &&
+                    $duration->i === 0 &&
+                    $duration->s === 0
+                ) {
+                    throw new InvalidArgumentException('Duration interval cannot be zero.');
+                }
+
+                if ($startTime === null) {
+                    throw new InvalidArgumentException('startTime is required when endTimeOrDuration is provided as a DateInterval string.');
+                }
+
+                $startTimeAsDate = $startTime->toDateTimeImmutable();
+                $endTimeAsDate = $startTimeAsDate->add($duration);
+                $endTime = new ChronosTime($endTimeAsDate);
+
+                return [$endTime, $duration];
+            } catch (DateMalformedIntervalStringException $e) {
+                throw new InvalidArgumentException('Duration as a string should be in ISO8601 format: ' . $endTimeOrDuration, 0, $e);
+            }
+        }
+
+        throw new InvalidArgumentException('Unsupported endTimeOrDuration type.');
     }
 }

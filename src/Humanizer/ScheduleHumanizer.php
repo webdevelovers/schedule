@@ -34,6 +34,8 @@ readonly class ScheduleHumanizer
     public function humanize(): array
     {
         $parts = [];
+        $translator = $this->translator;
+        $locale = $this->locale;
 
         $this->humanizeFromToDate($parts);
         $this->humanizeFromToTime($parts);
@@ -43,10 +45,9 @@ readonly class ScheduleHumanizer
 
         // Exclusions
         if (count($this->schedule->exceptDates) > 0) {
-            $dates = array_map(fn (ChronosDate $d) => $this->formatDate($d), $this->schedule->exceptDates);
-            $parts['except-dates'] = $this->translator->trans('schedule.except', [
-                '%dates%' => implode(', ', $dates),
-            ], domain: 'schedule', locale: $this->locale);
+            $dates = array_map(fn (ChronosDate $d) => ScheduleHumanizer::formatDate($d), $this->schedule->exceptDates);
+            $dates = implode(', ', $dates);
+            $parts['except-dates'] = self::translate($translator, 'schedule.except', ['%dates%' => $dates], $locale);
         }
 
         return $parts;
@@ -60,21 +61,24 @@ readonly class ScheduleHumanizer
     /** @param array<string,string> $parts */
     private function humanizeFromToDate(array &$parts): void
     {
-        if ($this->schedule->startDate) {
-            if ($this->schedule->endDate) {
+        $startDate = $this->schedule->startDate;
+        $endDate = $this->schedule->endDate;
+
+        if ($startDate) {
+            if ($endDate) {
                 $parts['date-interval'] = $this->translator->trans('schedule.from_to_date', [
-                    '%start%' => $this->formatDate($this->schedule->startDate->toDateTimeImmutable()),
-                    '%end%' => $this->formatDate($this->schedule->endDate->toDateTimeImmutable()),
+                    '%start%' => ScheduleHumanizer::formatDate($startDate->toDateTimeImmutable()),
+                    '%end%' => ScheduleHumanizer::formatDate($endDate->toDateTimeImmutable()),
                 ], domain: 'schedule', locale: $this->locale);
             } else {
                 $parts['date-interval'] = $this->translator->trans('schedule.from_date', [
-                    '%start%' => $this->formatDate($this->schedule->startDate->toDateTimeImmutable()),
+                    '%start%' => ScheduleHumanizer::formatDate($startDate->toDateTimeImmutable()),
                 ], domain: 'schedule', locale: $this->locale);
             }
         } else {
-            if ($this->schedule->endDate) {
+            if ($endDate) {
                 $parts['date-interval'] = $this->translator->trans('schedule.to_date', [
-                    '%end%' => $this->formatDate($this->schedule->endDate->toDateTimeImmutable()),
+                    '%end%' => ScheduleHumanizer::formatDate($endDate->toDateTimeImmutable()),
                 ], domain: 'schedule', locale: $this->locale);
             }
         }
@@ -95,8 +99,8 @@ readonly class ScheduleHumanizer
                 $parts['time-interval'] = $this->translator->trans(
                     'schedule.from_to_time',
                     [
-                        '%start%' => $this->formatTime($schedule->startTime->toDateTimeImmutable()),
-                        '%end%' => $this->formatTime($schedule->endTime->toDateTimeImmutable()),
+                        '%start%' => ScheduleHumanizer::formatTime($schedule->startTime->toDateTimeImmutable()),
+                        '%end%' => ScheduleHumanizer::formatTime($schedule->endTime->toDateTimeImmutable()),
                         '%duration%' => $durationStr,
                     ],
                     domain: 'schedule',
@@ -106,7 +110,7 @@ readonly class ScheduleHumanizer
                 $parts['time-interval'] = $this->translator->trans(
                     'schedule.from_time',
                     [
-                        '%start%' => $this->formatTime($schedule->startTime->toDateTimeImmutable()),
+                        '%start%' => ScheduleHumanizer::formatTime($schedule->startTime->toDateTimeImmutable()),
                     ],
                     domain: 'schedule',
                     locale: $this->locale,
@@ -117,7 +121,7 @@ readonly class ScheduleHumanizer
                 $parts['time-interval'] = $this->translator->trans(
                     'schedule.to_time',
                     [
-                        '%end%' => $this->formatTime($schedule->endTime->toDateTimeImmutable()),
+                        '%end%' => ScheduleHumanizer::formatTime($schedule->endTime->toDateTimeImmutable()),
                     ],
                     domain: 'schedule',
                     locale: $this->locale,
@@ -308,6 +312,22 @@ readonly class ScheduleHumanizer
         );
     }
 
+    /** @param array<string,string> $parts */
+    private static function translate(
+        HumanizerTranslatorInterface $translator,
+        string $key,
+        array $parameters = [],
+        string $locale = 'it'
+    ): string
+    {
+        return $translator->trans(
+            key: $key,
+            parameters: $parameters,
+            domain: 'schedule',
+            locale: $locale,
+        );
+    }
+
     /** @param int[] $monthWeeks */
     private function humanizeMonthWeeks(array $monthWeeks): string
     {
@@ -328,7 +348,7 @@ readonly class ScheduleHumanizer
         });
 
         $labels = array_map(function (int $w): string {
-            $key = $this->monthWeekToLabel($w);
+            $key = ScheduleHumanizer::monthWeekToLabel($w);
 
             return $this->translator->trans($key, [], 'schedule', $this->locale);
         }, $monthWeeks);
@@ -343,7 +363,7 @@ readonly class ScheduleHumanizer
         );
     }
 
-    private function monthWeekToLabel(int $monthWeek): string
+    private static function monthWeekToLabel(int $monthWeek): string
     {
         return match ($monthWeek) {
             1 => 'schedule.month_week.first',
@@ -353,21 +373,21 @@ readonly class ScheduleHumanizer
             5 => 'schedule.month_week.fifth',
             6 => 'schedule.month_week.sixth',
             -1 => 'schedule.month_week.last',
-            -2 => 'schedule.month_week.second_to_last',
-            -3 => 'schedule.month_week.third_to_last',
-            -4 => 'schedule.month_week.fourth_to_last',
-            -5 => 'schedule.month_week.fifth_to_last',
-            -6 => 'schedule.month_week.sixth_to_last',
+            -2 => 'schedule.month_week.second_last',
+            -3 => 'schedule.month_week.third_last',
+            -4 => 'schedule.month_week.fourth_last',
+            -5 => 'schedule.month_week.fifth_last',
+            -6 => 'schedule.month_week.sixth_last',
             default => throw new InvalidArgumentException('Invalid month week: ' . $monthWeek),
         };
     }
 
-    private function formatDate(DateTimeInterface|ChronosDate $date): string
+    private static function formatDate(DateTimeInterface|ChronosDate $date): string
     {
         return $date->format('d/m/Y');
     }
 
-    private function formatTime(DateTimeInterface $date): string
+    private static function formatTime(DateTimeInterface $date): string
     {
         return $date->format('H:i');
     }

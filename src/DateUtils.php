@@ -4,92 +4,106 @@ declare(strict_types=1);
 
 namespace WebDevelovers\Schedule;
 
-use Cake\Chronos\ChronosTime;
-use DateInterval;
-use DateMalformedIntervalStringException;
 use InvalidArgumentException;
 
+use WebDevelovers\Schedule\Enum\UnitOfTime;
 use function strlen;
 
 class DateUtils
 {
     /**
-     * @return array{0: ChronosTime|null, 1: DateInterval|null}
-     *
-     * @throws InvalidArgumentException
+     * Converts a numeric value into a string duration in "hh:mm" format.
+     * $value is a float in a specified $unit (seconds|minutes|hours|days).
      */
-    public static function endTimeAndDurationFromParam(ChronosTime|DateInterval|string|null $endTimeOrDuration, ChronosTime|null $startTime): array
+    public static function toHoursAndMinutes(float $value, UnitOfTime $unitOfTime): string
     {
-        if ($endTimeOrDuration === null) {
-            return [null, null];
+        $seconds = self::convertUnitOfTimeIntoSeconds($value, $unitOfTime);
+
+        $sign = $seconds < 0 ? '-' : '';
+        $secondsAbs = abs($seconds);
+
+        // arrotonda ai minuti
+        $minutesFloat = $secondsAbs / 60.0;
+        $totalMinutes = (int) floor($minutesFloat + 0.5);
+        $hours = (int) floor($totalMinutes / 60);
+        $minutes = $totalMinutes % 60;
+
+        return sprintf('%s%02d:%02d', $sign, $hours, $minutes);
+    }
+
+    /**
+     * Parse a string in hh:mm format into a float value in the specified unit.
+     * $unit can be: seconds|minutes|hours|days.
+     */
+    public static function fromHoursAndMinutes(string $hhmm, UnitOfTime $unitOfTime): float
+    {
+        $trim = trim($hhmm);
+        if ($trim === '') {
+            throw new InvalidArgumentException('Empty hh:mm string.');
         }
 
-        if ($endTimeOrDuration instanceof DateInterval) {
-            if (
-                $endTimeOrDuration->y === 0 &&
-                $endTimeOrDuration->m === 0 &&
-                $endTimeOrDuration->d === 0 &&
-                $endTimeOrDuration->h === 0 &&
-                $endTimeOrDuration->i === 0 &&
-                $endTimeOrDuration->s === 0
-            ) {
-                throw new InvalidArgumentException('Duration interval cannot be zero.');
-            }
-
-            if ($startTime === null) {
-                throw new InvalidArgumentException('startTime is required when endTimeOrDuration is provided as DateInterval.');
-            }
-
-            $startTimeAsDate = $startTime->toDateTimeImmutable();
-            $endTime = new ChronosTime($startTimeAsDate->add($endTimeOrDuration));
-
-            return [$endTime, $endTimeOrDuration];
+        $sign = 1.0;
+        if ($trim[0] === '-') {
+            $sign = -1.0;
+            $trim = substr($trim, 1);
+        } elseif ($trim[0] === '+') {
+            $trim = substr($trim, 1);
         }
 
-        if ($endTimeOrDuration instanceof ChronosTime) {
-            $endTimeAsDate = $endTimeOrDuration->toDateTimeImmutable();
-            if ($startTime === null) {
-                return [$endTimeOrDuration, null];
-            }
-
-            if ($endTimeOrDuration->lessThan($startTime)) {
-                $endTimeAsDate = $endTimeAsDate->add(new DateInterval('P1D'));
-            }
-
-            $startTimeAsDate = $startTime->toDateTimeImmutable();
-            $duration = $startTimeAsDate->diff($endTimeAsDate);
-
-            return [$endTimeOrDuration, $duration];
+        $parts = explode(':', $trim);
+        if (count($parts) !== 2) {
+            throw new InvalidArgumentException('Invalid hh:mm format.');
         }
 
-        if (strlen($endTimeOrDuration) > 0) {
-            try {
-                $duration = new DateInterval($endTimeOrDuration);
-                if (
-                    $duration->y === 0 &&
-                    $duration->m === 0 &&
-                    $duration->d === 0 &&
-                    $duration->h === 0 &&
-                    $duration->i === 0 &&
-                    $duration->s === 0
-                ) {
-                    throw new InvalidArgumentException('Duration interval cannot be zero.');
-                }
-
-                if ($startTime === null) {
-                    throw new InvalidArgumentException('startTime is required when endTimeOrDuration is provided as a DateInterval string.');
-                }
-
-                $startTimeAsDate = $startTime->toDateTimeImmutable();
-                $endTimeAsDate = $startTimeAsDate->add($duration);
-                $endTime = new ChronosTime($endTimeAsDate);
-
-                return [$endTime, $duration];
-            } catch (DateMalformedIntervalStringException $e) {
-                throw new InvalidArgumentException('Duration as a string should be in ISO8601 format: ' . $endTimeOrDuration, 0, $e);
-            }
+        [$hStr, $mStr] = $parts;
+        if ($hStr === '' || $mStr === '' || !ctype_digit($hStr) || !ctype_digit($mStr)) {
+            throw new InvalidArgumentException('Invalid hh:mm numeric parts.');
         }
 
-        throw new InvalidArgumentException('Unsupported endTimeOrDuration type.');
+        $hours = (int) $hStr;
+        $minutes = (int) $mStr;
+
+        if ($minutes < 0 || $minutes > 59) {
+            throw new InvalidArgumentException('Minutes must be between 00 and 59.');
+        }
+
+        $totalSeconds = ($hours * 3600) + ($minutes * 60);
+        $totalSeconds *= $sign;
+
+        return self::convertSecondsIntoUnitOfTime((float) $totalSeconds, $unitOfTime);
+    }
+
+    /**
+     * Converts a value in the specified unit to seconds.
+     * $unit: seconds|minutes|hours|days
+     */
+    public static function convertUnitOfTimeIntoSeconds(float $value, UnitOfTime $unitOfTime): float
+    {
+        return match ($unitOfTime) {
+            UnitOfTime::SECONDS => $value,
+            UnitOfTime::MINUTES => $value * 60.0,
+            UnitOfTime::HOURS   => $value * 3600.0,
+            UnitOfTime::DAYS    => $value * 86400.0,
+            UnitOfTime::WEEKS   => $value * 7.0 * 86400.0,
+            UnitOfTime::MONTHS  => $value * 30.0 * 86400.0,
+            UnitOfTime::YEARS   => $value * 365.0 * 86400.0,
+        };
+    }
+
+    /**
+     * Converts a value in seconds to the specified unit.
+     * $unit: seconds|minutes|hours|days
+     */
+    public static function convertSecondsIntoUnitOfTime(float $seconds, UnitOfTime $unitOfTime): float
+    {
+        return match ($unitOfTime) {
+            UnitOfTime::SECONDS => $seconds,
+            UnitOfTime::MINUTES => $seconds / 60.0,
+            UnitOfTime::HOURS   => $seconds / 3600.0,
+            UnitOfTime::DAYS    => $seconds / 86400.0,
+            UnitOfTime::WEEKS   => $seconds / (7.0 * 86400.0),
+            UnitOfTime::MONTHS  => $seconds / (30.0 * 86400.0),
+            UnitOfTime::YEARS   => $seconds / (365.0 * 86400.0),
+        };
     }
 }

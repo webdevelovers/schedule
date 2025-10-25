@@ -1,39 +1,43 @@
 # DayOfWeek
-schedule.day.monday: Monday
-schedule.day.tuesday: Tuesday
-schedule.day.wednesday: Wednesday
-schedule.day.thursday: Thursday
-schedule.day.friday: Friday
-schedule.day.saturday: Saturday
-schedule.day.sunday: Sunday
-
-# Frequency
-schedule.frequency.none: No repetition
-schedule.frequency.daily: Daily
-schedule.frequency.weekly: Weekly
-schedule.frequency.every_two_weeks: Every two weeks
-schedule.frequency.every_three_weeks: Every three weeks
-schedule.frequency.every_four_weeks: Every four weeks
-schedule.frequency.monthly: Monthly
-schedule.frequency.every_two_months: Every two months
-schedule.frequency.every_three_months: Every three months
-schedule.frequency.every_four_months: Every four months
-schedule.frequency.every_six_months: Every six months
-schedule.frequency.yearly: Yearly
+schedule.day.monday: monday
+schedule.day.tuesday: tuesday
+schedule.day.wednesday: wednesday
+schedule.day.thursday: thursday
+schedule.day.friday: friday
+schedule.day.saturday: saturday
+schedule.day.sunday: sunday
 
 # Month
-schedule.month.january: January
-schedule.month.february: February
-schedule.month.march: March
-schedule.month.april: April
-schedule.month.may: May
-schedule.month.june: June
-schedule.month.july: July
-schedule.month.august: August
-schedule.month.september: September
-schedule.month.october: October
-schedule.month.november: November
-schedule.month.december: December
+schedule.month.january: january
+schedule.month.february: february
+schedule.month.march: march
+schedule.month.april: april
+schedule.month.may: may
+schedule.month.june: june
+schedule.month.july: july
+schedule.month.august: august
+schedule.month.september: september
+schedule.month.october: october
+schedule.month.november: november
+schedule.month.december: december
+
+# UnitOfTime
+schedule.unit_of_time.seconds: seconds
+schedule.unit_of_time.minutes: minutes
+schedule.unit_of_time.hours: hours
+schedule.unit_of_time.days: days
+schedule.unit_of_time.weeks: weeks
+schedule.unit_of_time.months: months
+schedule.unit_of_time.years: years
+
+# Start/End Date, Time, Repeat Count
+schedule.from_date: 'dal %start%'
+schedule.from_to_date: 'dal %start% fino al %end%'
+schedule.to_date: 'fino al %end%'
+schedule.from_to_time: 'dalle %start% alle %end% (%duration%)'
+schedule.from_time: 'dalle %start%'
+schedule.to_time: 'fino alle %end%'
+schedule.repeat_count: '%count% occorrenze'
 
 # Interval
 schedule.interval: '%interval%'
@@ -48,14 +52,36 @@ schedule.interval.hours: '%count% hours'
 schedule.interval.minute: '%count% minute'
 schedule.interval.minutes: '%count% minutes'
 
-# Schedule
-schedule.from_date: 'from %date%'
-schedule.every_day: 'every day'
-schedule.every_days: 'every %days%'
-schedule.every_month_days: 'on the %days% of every month'
-schedule.every_x: 'every %interval%'
-schedule.from_to: 'from %start% to %end%'
-schedule.from_duration: 'from %start% for %duration%'
-schedule.repeat_count: '%count% occurrences'
-schedule.until: 'until %date%'
-schedule.except: 'except %dates%'
+# Frequency
+schedule.frequency.none: no repetitions
+schedule.frequency.daily: daily
+schedule.frequency.weekly: every 7 days
+schedule.frequency.every_two_weeks: Every 14 days
+schedule.frequency.every_three_weeks: Every 21 days
+schedule.frequency.every_four_weeks: Every 28 days
+schedule.frequency.monthly: every 30 days
+schedule.frequency.every_two_months: every 60 days
+schedule.frequency.every_three_months: every 90 days
+schedule.frequency.every_four_months: every 120 days
+schedule.frequency.every_six_months: every 180 days
+schedule.frequency.yearly: every 365 days
+
+# MonthWeek
+schedule.month_week.first: 'first'
+schedule.month_week.second: 'second'
+schedule.month_week.third: 'third'
+schedule.month_week.fourth: 'fourth'
+schedule.month_week.fifth: 'fifth'
+schedule.month_week.sixth: 'sixth'
+schedule.month_week.last: 'last'
+schedule.month_week.second_last: 'second last'
+schedule.month_week.third_last: 'third last'
+schedule.month_week.fourth_last: 'fourth last'
+schedule.month_week.fifth_last: 'fifth last'
+schedule.month_week.sixth_last: 'sixth last'
+
+# Filters
+schedule.every_month_days: 'every %days% of the month'
+schedule.every_months: 'in %months%'
+schedule.every_month_weeks: 'every %month_weeks% week of the month'
+schedule.except: 'excluding %dates%'

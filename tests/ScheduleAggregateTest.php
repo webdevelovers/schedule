@@ -271,7 +271,7 @@ class ScheduleAggregateTest extends TestCase
     public function testFromArrayMissingSchedulesThrows(): void
     {
         $this->expectException(ScheduleException::class);
-        $this->expectExceptionMessage('Missing "schedules" array');
+        $this->expectExceptionMessage('Missing or invalid "schedules" key.');
 
         ScheduleAggregate::fromArray([
             'type' => 'ScheduleAggregate',

@@ -18,87 +18,8 @@ class ScheduleHumanizerTest extends TestCase
 {
     private function getTranslator(): HumanizerTranslatorInterface
     {
-        $defaultTranslations = [
-            // DayOfWeeks
-            'schedule.day.monday'       => 'lunedì',
-            'schedule.day.tuesday'      => 'martedì',
-            'schedule.day.wednesday'    => 'mercoledì',
-            'schedule.day.thursday'     => 'giovedì',
-            'schedule.day.friday'       => 'venerdì',
-            'schedule.day.saturday'     => 'sabato',
-            'schedule.day.sunday'       => 'domenica',
-
-            // Months
-            'schedule.month.january'             => 'Gennaio',
-            'schedule.month.february'            => 'Febbraio',
-            'schedule.month.march'               => 'Marzo',
-            'schedule.month.april'               => 'Aprile',
-            'schedule.month.may'                 => 'Maggio',
-            'schedule.month.june'                => 'Giugno',
-            'schedule.month.july'                => 'Luglio',
-            'schedule.month.august'              => 'Agosto',
-            'schedule.month.september'           => 'Settembre',
-            'schedule.month.october'             => 'Ottobre',
-            'schedule.month.november'            => 'Novembre',
-            'schedule.month.december'            => 'Dicembre',
-
-            // Start/End Date, Time, Repeat Count
-            'schedule.from_date'                 => 'dal %start%',
-            'schedule.from_to_date'              => 'dal %start% fino al %end%',
-            'schedule.to_date'                   => 'fino al %end%',
-            'schedule.from_to_time'              => 'dalle %start% alle %end% (%duration%)',
-            'schedule.from_time'                 => 'dalle %start%',
-            'schedule.to_time'                   => 'fino alle %end%',
-            'schedule.repeat_count'              => '%count% occorrenze',
-
-            // Interval
-            'schedule.interval.year'    => '%count% anno',
-            'schedule.interval.years'   => '%count% anni',
-            'schedule.interval.month'   => '%count% mese',
-            'schedule.interval.months'  => '%count% mesi',
-            'schedule.interval.day'     => '%count% giorno',
-            'schedule.interval.days'    => '%count% giorni',
-            'schedule.interval.hour'    => '%count% ora',
-            'schedule.interval.hours'   => '%count% ore',
-            'schedule.interval.minute'  => '%count% minuto',
-            'schedule.interval.minutes' => '%count% minuti',
-
-            // Frequency
-            'schedule.frequency.none'               => 'nessuna ripetizione',
-            'schedule.frequency.daily'              => 'ripetizione giornaliera',
-            'schedule.frequency.every_week'         => 'ogni 7 giorni',
-            'schedule.frequency.every_two_weeks'    => 'ogni due settimane',
-            'schedule.frequency.every_three_weeks'  => 'ogni tre settimane',
-            'schedule.frequency.every_four_weeks'   => 'ogni quattro settimane',
-            'schedule.frequency.every_month'        => 'ogni 30 giorni',
-            'schedule.frequency.every_two_months'   => 'ogni due mesi',
-            'schedule.frequency.every_three_months' => 'ogni tre mesi',
-            'schedule.frequency.every_four_months'  => 'ogni quattro mesi',
-            'schedule.frequency.every_six_months'   => 'ogni sei mesi',
-            'schedule.frequency.every_year'         => 'ogni 365 giorni',
-
-            // MonthWeek
-            'schedule.month_week.first'             => 'prima',
-            'schedule.month_week.second'            => 'seconda',
-            'schedule.month_week.third'             => 'terza',
-            'schedule.month_week.fourth'            => 'quarta',
-            'schedule.month_week.fifth'             => 'quinta',
-            'schedule.month_week.sixth'             => 'sesta',
-            'schedule.month_week.last'              => 'ultima',
-            'schedule.month_week.second_to_last'    => 'penultima',
-            'schedule.month_week.third_to_last'     => 'terzultima',
-            'schedule.month_week.fourth_to_last'    => 'quartultima',
-            'schedule.month_week.fifth_to_last'     => 'quintultima',
-            'schedule.month_week.sixth_to_last'     => 'sestultima',
-
-            // Filters
-            'schedule.every_month_days'         => 'il %days% del mese',
-            'schedule.every_months'             => 'a %months%',
-            'schedule.every_month_weeks'        => 'ogni %month_weeks% settimana del mese',
-            'schedule.except'                   => 'esclusi %dates%',
-        ];
-
-        return new ArrayTranslator($defaultTranslations);
+        $path = __DIR__ . '/../translations/schedule.it.yaml';
+        return ArrayTranslator::fromYaml($path);
     }
 
     public function testEveryDay()
@@ -295,7 +216,7 @@ class ScheduleHumanizerTest extends TestCase
         $parts = $humanizer->humanize();
 
         $this->assertArrayHasKey('by-months', $parts);
-        $this->assertSame('a Gennaio, Marzo, Dicembre', $parts['by-months']);
+        $this->assertSame('a gennaio, marzo, dicembre', $parts['by-months']);
         $this->assertArrayHasKey('interval', $parts);
         $this->assertSame('ogni 365 giorni', $parts['interval']);
     }
@@ -362,7 +283,7 @@ class ScheduleHumanizerTest extends TestCase
         $this->assertSame('il 5, 20 del mese', $parts['by-month-days']);
 
         $this->assertArrayHasKey('by-months', $parts);
-        $this->assertSame('a Febbraio, Aprile', $parts['by-months']); // ordinati
+        $this->assertSame('a febbraio, aprile', $parts['by-months']); // ordinati
 
         $this->assertArrayHasKey('by-month-weeks', $parts);
         $this->assertSame('ogni prima e ultima settimana del mese', $parts['by-month-weeks']);

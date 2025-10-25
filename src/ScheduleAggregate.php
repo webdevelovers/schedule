@@ -68,9 +68,17 @@ class ScheduleAggregate implements JsonSerializable
      */
     public static function fromArray(array $data): self
     {
+        if ( count($data) === 0)
+        {
+            return new self([]);
+        }
+
         try {
-            if (! isset($data['schedules']) || ! is_array($data['schedules'])) {
-                throw new ScheduleException('Missing "schedules" array.');
+            if (
+                ! array_key_exists('schedules', $data) ||
+                ! is_array($data['schedules']))
+            {
+                throw new ScheduleException('Missing or invalid "schedules" key.');
             }
 
             $schedules = [];
@@ -186,6 +194,18 @@ class ScheduleAggregate implements JsonSerializable
         }
 
         return [$minStart, $maxEnd]; // [ChronosDate|null, ChronosDate|null]
+    }
+
+    public function getMinStartDate(): ChronosDate|null
+    {
+        [$minStart] = $this->getBounds();
+        return $minStart;
+    }
+
+    public function getMaxEndDate(): ChronosDate|null
+    {
+        [$minStart, $maxEnd] = $this->getBounds();
+        return $maxEnd;
     }
 
     /**
