@@ -13,10 +13,132 @@ use WebDevelovers\Schedule\Schedule;
 
 class ScheduleTest extends TestCase
 {
+    private string $tz = 'UTC';
+
     public function testSimpleConstruction()
     {
         $schedule = new Schedule(ScheduleInterval::DAILY);
         $this->assertEquals(ScheduleInterval::DAILY, $schedule->repeatInterval);
+    }
+
+    public function testIdentifierIsDeterministicForSameData(): void
+    {
+        $s1 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-01-01'),
+            endDate: new ChronosDate('2024-01-31'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 5,
+            byDay: [DayOfWeek::MONDAY, DayOfWeek::WEDNESDAY],
+            byMonthDay: [1, 15],
+            byMonth: [Month::JANUARY],
+            byMonthWeek: [1, -1],
+            exceptDates: [new ChronosDate('2024-01-10')],
+            timezone: $this->tz
+        );
+
+        $s2 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-01-01'),
+            endDate: new ChronosDate('2024-01-31'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 5,
+            byDay: [DayOfWeek::MONDAY, DayOfWeek::WEDNESDAY],
+            byMonthDay: [1, 15],
+            byMonth: [Month::JANUARY],
+            byMonthWeek: [1, -1],
+            exceptDates: [new ChronosDate('2024-01-10')],
+            timezone: $this->tz
+        );
+
+        $this->assertSame($s1->identifier, $s2->identifier);
+    }
+
+    public function testIdentifierChangesWhenRelevantFieldChanges(): void
+    {
+        $base = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-01-01'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            timezone: $this->tz
+        );
+
+        $changed = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-01-02'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            timezone: $this->tz
+        );
+
+        $this->assertNotSame($base->identifier, $changed->identifier);
+    }
+
+    public function testIdentifierIsRecomputedInFromArrayIgnoringExternalIdentifier(): void
+    {
+        $s = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-01-01'),
+            endDate: new ChronosDate('2024-01-02'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            timezone: $this->tz
+        );
+
+        $data = $s->toArray();
+        $this->assertArrayHasKey('identifier', $data);
+
+        $data['identifier'] = 'FORGED_IDENTIFIER';
+
+        $recreated = Schedule::fromArray($data);
+
+        $this->assertSame($s->identifier, $recreated->identifier);
+    }
+
+    public function testIdentifierIsPreservedAcrossSerializeCycle(): void
+    {
+        $s = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-02-01'),
+            endDate: new ChronosDate('2024-02-05'),
+            startTime: new ChronosTime('08:00'),
+            endTimeOrDuration: 'PT30M',
+            timezone: $this->tz
+        );
+
+        $id1 = $s->identifier;
+
+        $serialized = serialize($s);
+        /** @var Schedule $unser */
+        $unser = unserialize($serialized);
+
+        $this->assertSame($id1, $unser->identifier);
+    }
+
+    public function testIdentifierDiffersIfExceptDatesChange(): void
+    {
+        $s1 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-03-01'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            exceptDates: [],
+            timezone: $this->tz
+        );
+
+        $s2 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-03-01'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            exceptDates: [new ChronosDate('2024-03-02')],
+            timezone: $this->tz
+        );
+
+        $this->assertNotSame($s1->identifier, $s2->identifier);
     }
 
     public function testValidScheduleDoesNotThrow()
@@ -632,6 +754,41 @@ class ScheduleTest extends TestCase
         $this->assertIsArray($decoded);
         $this->assertArrayHasKey('repeatInterval', $decoded);
         $this->assertSame(ScheduleInterval::DAILY->value, $decoded['repeatInterval']);
+    }
+
+    public function testToJsonIncludesIdentifier(): void
+    {
+        $s = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-01-01'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            timezone: 'UTC'
+        );
+
+        $json = $s->toJson();
+        $decoded = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertArrayHasKey('identifier', $decoded);
+        $this->assertSame($s->identifier, $decoded['identifier']);
+    }
+
+    public function testFromJsonIgnoresExternalIdentifier(): void
+    {
+        $s = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-01-01'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            timezone: 'UTC'
+        );
+
+        $arr = $s->toArray();
+        $arr['identifier'] = 'FORGED';
+        $json = json_encode($arr, JSON_THROW_ON_ERROR);
+
+        $restored = Schedule::fromJson($json);
+        $this->assertSame($s->identifier, $restored->identifier);
     }
 
     public function testFromArrayMissingRepeatIntervalThrows(): void

@@ -189,6 +189,7 @@ readonly class ScheduleExpander
                 end: $endDT,
                 timezone: $timezone,
                 isHoliday: $isHoliday,
+                scheduleIdentifier: $schedule->identifier,
             );
 
             $occurrences++;
@@ -275,7 +276,13 @@ readonly class ScheduleExpander
 
         $isHoliday = $holidaysProvider && $holidaysProvider->isHoliday($currentDate);
 
-        yield new ScheduleOccurrence($startDT, $endDT, $timezone, $isHoliday);
+        yield new ScheduleOccurrence(
+            start: $startDT,
+            end: $endDT,
+            timezone: $timezone,
+            isHoliday: $isHoliday,
+            scheduleIdentifier: $schedule->identifier,
+        );
     }
 
     /** @throws ScheduleExpandException */

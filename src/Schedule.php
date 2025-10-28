@@ -43,6 +43,7 @@ class Schedule implements JsonSerializable
 {
     private const string DEFAULT_TIMEZONE = 'UTC';
 
+    public readonly string $identifier;
     public ChronosTime|null $endTime;
     public DateInterval|null $duration;
     public DateTimeZone $timezone;
@@ -95,6 +96,31 @@ class Schedule implements JsonSerializable
         $this->validateByMonthDay();
         $this->validateByMonthWeek();
         $this->validateExceptDates();
+
+        $this->generateIdentifier();
+    }
+
+    private function generateIdentifier(): void
+    {
+        $dataArray = [
+            'byDay' => $this->byDay ? array_map(static fn (DayOfWeek $d) => $d->value, $this->byDay) : null,
+            'byMonth' => $this->byMonth ? array_map(static fn (Month $d) => $d->value, $this->byMonth) : null,
+            'byMonthDay' => $this->byMonthDay,
+            'byMonthWeek' => $this->byMonthWeek,
+            'duration' => $this->duration?->format('P%yY%mM%dDT%hH%iM%sS'),
+            'endDate' => $this->endDate?->format('Y/m/d'),
+            'endTime' => $this->endTime?->format('H:i:s'),
+            'exceptDates' => array_map(static fn (ChronosDate $chronosDate) => $chronosDate->format('Y/m/d'), $this->exceptDates),
+            'repeatCount' => $this->repeatCount,
+            'repeatInterval' => $this->repeatInterval->value,
+            'startDate' => $this->startDate?->format('Y/m/d'),
+            'startTime' => $this->startTime?->format('H:i:s'),
+            'timezone' => $this->timezone->getName(),
+        ];
+
+        $json = json_encode($dataArray, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        $this->identifier = hash('sha256', $json);
     }
 
     /**
@@ -105,6 +131,7 @@ class Schedule implements JsonSerializable
     public function toArray(): array
     {
         return [
+            'identifier' => $this->identifier,
             'startDate' => $this->startDate?->format('Y/m/d'),
             'endDate' => $this->endDate?->format('Y/m/d'),
             'startTime' => $this->startTime?->format('H:i:s'),
@@ -274,6 +301,7 @@ class Schedule implements JsonSerializable
         $this->byMonth = $instance->byMonth;
         $this->byMonthWeek = $instance->byMonthWeek;
         $this->exceptDates = $instance->exceptDates;
+        $this->generateIdentifier();
     }
 
     /**
