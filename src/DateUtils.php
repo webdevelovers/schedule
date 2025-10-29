@@ -5,9 +5,16 @@ declare(strict_types=1);
 namespace WebDevelovers\Schedule;
 
 use InvalidArgumentException;
-
 use WebDevelovers\Schedule\Enum\UnitOfTime;
-use function strlen;
+
+use function abs;
+use function count;
+use function ctype_digit;
+use function explode;
+use function floor;
+use function sprintf;
+use function substr;
+use function trim;
 
 class DateUtils
 {
@@ -56,7 +63,7 @@ class DateUtils
         }
 
         [$hStr, $mStr] = $parts;
-        if ($hStr === '' || $mStr === '' || !ctype_digit($hStr) || !ctype_digit($mStr)) {
+        if ($hStr === '' || $mStr === '' || ! ctype_digit($hStr) || ! ctype_digit($mStr)) {
             throw new InvalidArgumentException('Invalid hh:mm numeric parts.');
         }
 

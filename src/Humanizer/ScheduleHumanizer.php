@@ -45,7 +45,7 @@ readonly class ScheduleHumanizer
 
         // Exclusions
         if (count($this->schedule->exceptDates) > 0) {
-            $dates = array_map(fn (ChronosDate $d) => ScheduleHumanizer::formatDate($d), $this->schedule->exceptDates);
+            $dates = array_map(static fn (ChronosDate $d) => self::formatDate($d), $this->schedule->exceptDates);
             $dates = implode(', ', $dates);
             $parts['except-dates'] = self::translate($translator, 'schedule.except', ['%dates%' => $dates], $locale);
         }
@@ -67,18 +67,18 @@ readonly class ScheduleHumanizer
         if ($startDate) {
             if ($endDate) {
                 $parts['date-interval'] = $this->translator->trans('schedule.from_to_date', [
-                    '%start%' => ScheduleHumanizer::formatDate($startDate->toDateTimeImmutable()),
-                    '%end%' => ScheduleHumanizer::formatDate($endDate->toDateTimeImmutable()),
+                    '%start%' => self::formatDate($startDate->toDateTimeImmutable()),
+                    '%end%' => self::formatDate($endDate->toDateTimeImmutable()),
                 ], domain: 'schedule', locale: $this->locale);
             } else {
                 $parts['date-interval'] = $this->translator->trans('schedule.from_date', [
-                    '%start%' => ScheduleHumanizer::formatDate($startDate->toDateTimeImmutable()),
+                    '%start%' => self::formatDate($startDate->toDateTimeImmutable()),
                 ], domain: 'schedule', locale: $this->locale);
             }
         } else {
             if ($endDate) {
                 $parts['date-interval'] = $this->translator->trans('schedule.to_date', [
-                    '%end%' => ScheduleHumanizer::formatDate($endDate->toDateTimeImmutable()),
+                    '%end%' => self::formatDate($endDate->toDateTimeImmutable()),
                 ], domain: 'schedule', locale: $this->locale);
             }
         }
@@ -99,8 +99,8 @@ readonly class ScheduleHumanizer
                 $parts['time-interval'] = $this->translator->trans(
                     'schedule.from_to_time',
                     [
-                        '%start%' => ScheduleHumanizer::formatTime($schedule->startTime->toDateTimeImmutable()),
-                        '%end%' => ScheduleHumanizer::formatTime($schedule->endTime->toDateTimeImmutable()),
+                        '%start%' => self::formatTime($schedule->startTime->toDateTimeImmutable()),
+                        '%end%' => self::formatTime($schedule->endTime->toDateTimeImmutable()),
                         '%duration%' => $durationStr,
                     ],
                     domain: 'schedule',
@@ -110,7 +110,7 @@ readonly class ScheduleHumanizer
                 $parts['time-interval'] = $this->translator->trans(
                     'schedule.from_time',
                     [
-                        '%start%' => ScheduleHumanizer::formatTime($schedule->startTime->toDateTimeImmutable()),
+                        '%start%' => self::formatTime($schedule->startTime->toDateTimeImmutable()),
                     ],
                     domain: 'schedule',
                     locale: $this->locale,
@@ -121,7 +121,7 @@ readonly class ScheduleHumanizer
                 $parts['time-interval'] = $this->translator->trans(
                     'schedule.to_time',
                     [
-                        '%end%' => ScheduleHumanizer::formatTime($schedule->endTime->toDateTimeImmutable()),
+                        '%end%' => self::formatTime($schedule->endTime->toDateTimeImmutable()),
                     ],
                     domain: 'schedule',
                     locale: $this->locale,
@@ -312,14 +312,13 @@ readonly class ScheduleHumanizer
         );
     }
 
-    /** @param array<string,string> $parts */
+    /** @param array<string,string> $parameters */
     private static function translate(
         HumanizerTranslatorInterface $translator,
         string $key,
         array $parameters = [],
-        string $locale = 'it'
-    ): string
-    {
+        string $locale = 'it',
+    ): string {
         return $translator->trans(
             key: $key,
             parameters: $parameters,

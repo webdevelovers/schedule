@@ -23,13 +23,17 @@ use function array_key_exists;
 use function array_map;
 use function array_unique;
 use function count;
+use function hash;
 use function is_array;
 use function is_int;
 use function is_string;
 use function json_decode;
 use function json_encode;
+use function strlen;
 
 use const JSON_THROW_ON_ERROR;
+use const JSON_UNESCAPED_SLASHES;
+use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Represents an abstract schedule pattern, which can be used to describe
@@ -97,10 +101,11 @@ class Schedule implements JsonSerializable
         $this->validateByMonthWeek();
         $this->validateExceptDates();
 
-        $this->generateIdentifier();
+        $this->identifier = $this->generateIdentifier();
     }
 
-    private function generateIdentifier(): void
+    /** @throws ScheduleException */
+    private function generateIdentifier(): string
     {
         $dataArray = [
             'byDay' => $this->byDay ? array_map(static fn (DayOfWeek $d) => $d->value, $this->byDay) : null,
@@ -118,9 +123,13 @@ class Schedule implements JsonSerializable
             'timezone' => $this->timezone->getName(),
         ];
 
-        $json = json_encode($dataArray, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        try {
+            $json = json_encode($dataArray, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new ScheduleException('Error generating Identifier: ' . $e->getMessage(), previous: $e);
+        }
 
-        $this->identifier = hash('sha256', $json);
+        return hash('sha256', $json);
     }
 
     /**

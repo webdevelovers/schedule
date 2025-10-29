@@ -19,7 +19,7 @@ readonly class ScheduleOccurrence
         public DateTimeInterface $end,
         public DateTimeZone $timezone,
         public bool $isHoliday,
-        public string $scheduleIdentifier
+        public string $scheduleIdentifier,
     ) {
         $this->duration = $start->diff($end);
     }

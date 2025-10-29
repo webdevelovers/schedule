@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace WebDevelovers\Schedule\Enum;
 
 enum UnitOfTime: string

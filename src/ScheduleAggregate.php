@@ -12,9 +12,11 @@ use JsonSerializable;
 use Throwable;
 use WebDevelovers\Schedule\Exception\ScheduleException;
 
+use function array_key_exists;
 use function array_map;
 use function array_push;
 use function array_values;
+use function count;
 use function in_array;
 use function is_array;
 use function json_decode;
@@ -68,16 +70,15 @@ class ScheduleAggregate implements JsonSerializable
      */
     public static function fromArray(array $data): self
     {
-        if ( count($data) === 0)
-        {
+        if (count($data) === 0) {
             return new self([]);
         }
 
         try {
             if (
                 ! array_key_exists('schedules', $data) ||
-                ! is_array($data['schedules']))
-            {
+                ! is_array($data['schedules'])
+            ) {
                 throw new ScheduleException('Missing or invalid "schedules" key.');
             }
 
@@ -199,12 +200,14 @@ class ScheduleAggregate implements JsonSerializable
     public function getMinStartDate(): ChronosDate|null
     {
         [$minStart] = $this->getBounds();
+
         return $minStart;
     }
 
     public function getMaxEndDate(): ChronosDate|null
     {
         [$minStart, $maxEnd] = $this->getBounds();
+
         return $maxEnd;
     }
 

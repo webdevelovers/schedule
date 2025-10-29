@@ -35,9 +35,18 @@ readonly class ScheduleExpander
     public static function expandAggregate(
         ScheduleAggregate $aggregate,
         HolidayProviderInterface|null $holidaysProvider = null,
+        ChronosDate|null $from = null,
+        ChronosDate|null $to = null,
     ): Generator {
+        $index = 0;
         foreach ($aggregate->all() as $schedule) {
-            yield from self::expand($schedule, $holidaysProvider);
+            foreach (self::expand($schedule, $holidaysProvider, $from, $to) as $occurrence) {
+                $key = $index;
+
+                yield $key => $occurrence;
+
+                $index++;
+            }
         }
     }
 
@@ -55,13 +64,15 @@ readonly class ScheduleExpander
         HolidayProviderInterface|null $holidaysProvider = null,
         bool $ascending = true,
         bool $unique = true,
+        ChronosDate|null $from = null,
+        ChronosDate|null $to = null,
     ): Generator {
         $generators = [];
         $values = [];
 
         // Initialize: create generators and get the first value from each
         foreach ($aggregate->all() as $schedule) {
-            $generator = self::expand($schedule, $holidaysProvider);
+            $generator = self::expand($schedule, $holidaysProvider, $from, $to);
             if (! $generator->valid()) {
                 continue;
             }
@@ -118,11 +129,13 @@ readonly class ScheduleExpander
     public static function expand(
         Schedule $schedule,
         HolidayProviderInterface|null $holidayProvider = null,
+        ChronosDate|null $from = null,
+        ChronosDate|null $to = null,
     ): Generator {
         $timezone = $schedule->timezone;
 
-        $start = $schedule->startDate;
-        if (! $start) {
+        $start = self::calculateStart($schedule->startDate, $from);
+        if ($start === null) {
             return;
         }
 
@@ -142,7 +155,7 @@ readonly class ScheduleExpander
         $occurrences = 0;
         $repeatCount = $schedule->repeatCount;
         $interval = self::scheduleInterval($schedule);
-        $endDate = $schedule->endDate;
+        $endDate = self::calculateEnd($schedule->endDate, $to);
 
         while ($repeatCount === null || $occurrences < $repeatCount) {
             // Exit condition: endDate is present and reached
@@ -196,6 +209,32 @@ readonly class ScheduleExpander
 
             $current = $current->add($interval);
         }
+    }
+
+    private static function calculateStart(ChronosDate|null $startDate, ChronosDate|null $from): ChronosDate|null
+    {
+        if ($startDate !== null && $from !== null) {
+            return $startDate->greaterThan($from) ? $startDate : $from;
+        }
+
+        if ($startDate === null && $from === null) {
+            return null;
+        }
+
+        return $from ?? $startDate;
+    }
+
+    private static function calculateEnd(ChronosDate|null $endDate, ChronosDate|null $to): ChronosDate|null
+    {
+        if ($endDate !== null && $to !== null) {
+            return $endDate->lessThan($to) ? $endDate : $to;
+        }
+
+        if ($endDate === null && $to === null) {
+            return null;
+        }
+
+        return $to ?? $endDate;
     }
 
     private static function byDayFilterIsApplied(Schedule $schedule, ChronosDate $current): bool

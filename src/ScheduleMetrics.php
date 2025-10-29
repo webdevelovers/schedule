@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace WebDevelovers\Schedule;
 
 use DateInterval;
@@ -9,16 +11,17 @@ use WebDevelovers\Schedule\Enum\UnitOfTime;
 use WebDevelovers\Schedule\Exception\ScheduleExpandException;
 use WebDevelovers\Schedule\Holiday\HolidayProviderInterface;
 
+use function max;
+
 class ScheduleMetrics
 {
     /** @throws ScheduleExpandException */
     public static function seconds(
         ScheduleAggregate|Schedule $schedule,
         HolidayProviderInterface $holidayProvider,
-        DateTimeInterface|null $fromDate = null,
-        DateTimeInterface|null $toDate = null
-    ): int
-    {
+        DateTimeInterface|null $from = null,
+        DateTimeInterface|null $to = null,
+    ): int {
         $total = 0;
 
         if ($schedule instanceof ScheduleAggregate) {
@@ -32,8 +35,8 @@ class ScheduleMetrics
             $occurrenceEnd = $occurrence->end;
 
             if (
-                ($fromDate !== null && $occurrenceEnd !== null && $occurrenceEnd < $fromDate) ||
-                ($toDate !== null && $occurrenceStart !== null && $occurrenceStart > $toDate)
+                ($from !== null && $occurrenceEnd !== null && $occurrenceEnd < $from) ||
+                ($to !== null && $occurrenceStart !== null && $occurrenceStart > $to)
             ) {
                 continue;
             }
@@ -48,12 +51,11 @@ class ScheduleMetrics
     public static function minutes(
         ScheduleAggregate|Schedule $schedule,
         HolidayProviderInterface $holidayProvider,
-        DateTimeInterface|null $fromDate = null,
-        DateTimeInterface|null $toDate = null
-    ): float
-    {
-        $seconds = self::seconds($schedule, $holidayProvider, $fromDate, $toDate);
-        if($seconds === 0) {
+        DateTimeInterface|null $from = null,
+        DateTimeInterface|null $to = null,
+    ): float {
+        $seconds = self::seconds($schedule, $holidayProvider, $from, $to);
+        if ($seconds === 0) {
             return 0;
         }
 
@@ -64,12 +66,11 @@ class ScheduleMetrics
     public static function hours(
         ScheduleAggregate|Schedule $schedule,
         HolidayProviderInterface $holidayProvider,
-        DateTimeInterface|null $fromDate = null,
-        DateTimeInterface|null $toDate = null
-    ): float
-    {
-        $seconds = self::seconds($schedule, $holidayProvider, $fromDate, $toDate);
-        if($seconds === 0) {
+        DateTimeInterface|null $from = null,
+        DateTimeInterface|null $to = null,
+    ): float {
+        $seconds = self::seconds($schedule, $holidayProvider, $from, $to);
+        if ($seconds === 0) {
             return 0;
         }
 
@@ -80,11 +81,10 @@ class ScheduleMetrics
     public static function days(
         ScheduleAggregate|Schedule $schedule,
         HolidayProviderInterface $holidayProvider,
-        DateTimeInterface|null $fromDate = null,
-        DateTimeInterface|null $toDate = null
-    ): float
-    {
-        $seconds = self::seconds($schedule, $holidayProvider, $fromDate, $toDate);
+        DateTimeInterface|null $from = null,
+        DateTimeInterface|null $to = null,
+    ): float {
+        $seconds = self::seconds($schedule, $holidayProvider, $from, $to);
         if ($seconds === 0) {
             return 0;
         }
