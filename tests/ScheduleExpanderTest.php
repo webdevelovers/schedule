@@ -772,7 +772,6 @@ final class ScheduleExpanderTest extends TestCase
 
         $aggregate = new ScheduleAggregate([$s1, $s2]);
 
-        // With unique = false
         $occurrences = iterator_to_array(
             ScheduleExpander::expandAggregateSorted($aggregate, $this->holidaysProvider, true, false)
         );

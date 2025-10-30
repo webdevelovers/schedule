@@ -310,7 +310,7 @@ class Schedule implements JsonSerializable
         $this->byMonth = $instance->byMonth;
         $this->byMonthWeek = $instance->byMonthWeek;
         $this->exceptDates = $instance->exceptDates;
-        $this->generateIdentifier();
+        $this->identifier = $this->generateIdentifier();
     }
 
     /**
