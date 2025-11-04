@@ -9,8 +9,6 @@ use PHPUnit\Framework\TestCase;
 use WebDevelovers\Schedule\Enum\DayOfWeek;
 use WebDevelovers\Schedule\Enum\Month;
 use WebDevelovers\Schedule\Enum\ScheduleInterval;
-use WebDevelovers\Schedule\Exception\ScheduleException;
-use WebDevelovers\Schedule\Exception\ScheduleExpandException;
 use WebDevelovers\Schedule\Holiday\HolidayProviderInterface;
 use WebDevelovers\Schedule\Schedule;
 use WebDevelovers\Schedule\ScheduleAggregate;
@@ -572,6 +570,163 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2024-02-20 11:00', $occurrences[2]->start->format('Y-m-d H:i'));
     }
 
+    public function testExpandUsesFromAsStartWhenScheduleStartMissing(): void
+    {
+        // Schedule senza startDate, ma con durata valida (1h)
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 3,
+            timezone: $this->tz
+        );
+
+        // Range forzato: 2025-01-10..2025-01-12 (3 giorni)
+        $from = new ChronosDate('2025-01-10');
+        $to   = new ChronosDate('2025-01-12');
+
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
+        $this->assertCount(3, $occurrences);
+        $this->assertEquals('2025-01-10 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2025-01-12 09:00', $occurrences[2]->start->format('Y-m-d H:i'));
+    }
+
+    public function testExpandStopsAtToWhenScheduleEndMissing(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2025-01-01'),
+            startTime: new ChronosTime('08:00'),
+            endTimeOrDuration: 'PT30M',
+            timezone: $this->tz
+        );
+
+        // Range limita l'uscita all'11 gennaio
+        $from = new ChronosDate('2025-01-09');
+        $to   = new ChronosDate('2025-01-11');
+
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
+        $this->assertCount(3, $occurrences);
+
+        $this->assertEquals('2025-01-09 08:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2025-01-10 08:00', $occurrences[1]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2025-01-11 08:00', $occurrences[2]->start->format('Y-m-d H:i'));
+    }
+
+    public function testExpandWithinNarrowWindowYieldsOnlyIntersectingDays(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2025-01-01'),
+            endDate: new ChronosDate('2025-01-10'),
+            startTime: new ChronosTime('10:00'),
+            endTimeOrDuration: 'PT1H',
+            timezone: $this->tz
+        );
+
+        // Finestra stretta: 2025-01-03..2025-01-04
+        $from = new ChronosDate('2025-01-03');
+        $to   = new ChronosDate('2025-01-04');
+
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
+        $this->assertCount(2, $occurrences);
+        $this->assertEquals('2025-01-03 10:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2025-01-04 10:00', $occurrences[1]->start->format('Y-m-d H:i'));
+    }
+
+    public function testExpandReturnsEmptyWhenWindowBeforeSchedule(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2025-02-01'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 5,
+            timezone: $this->tz
+        );
+
+        $from = new ChronosDate('2025-01-01');
+        $to   = new ChronosDate('2025-01-15');
+
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
+        $this->assertCount(0, $occurrences);
+    }
+
+    public function testExpandReturnsEmptyWhenWindowAfterSchedule(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2025-01-01'),
+            endDate: new ChronosDate('2025-01-05'),
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            timezone: $this->tz
+        );
+
+        $from = new ChronosDate('2025-02-01');
+        $to   = new ChronosDate('2025-02-10');
+
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
+        $this->assertCount(0, $occurrences);
+    }
+
+    public function testExpandHonorsByDayWithinWindow(): void
+    {
+        // Finestra di una settimana, ma filtriamo solo lunedì (2 occorrenze nelle 2 settimane)
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startTime: new ChronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            byDay: [DayOfWeek::MONDAY],
+            timezone: $this->tz
+        );
+
+        $from = new ChronosDate('2025-01-06'); // Monday
+        $to   = new ChronosDate('2025-01-13'); // Next Monday
+
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
+        $this->assertCount(2, $occurrences);
+        $this->assertEquals('Monday', $occurrences[0]->start->format('l'));
+        $this->assertEquals('Monday', $occurrences[1]->start->format('l'));
+    }
+
+    public function testExpandWithOnlyFromProducesUnboundedTail(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startTime: new ChronosTime('07:00'),
+            endTimeOrDuration: 'PT15M',
+            repeatCount: 2,
+            timezone: $this->tz
+        );
+
+        $from = new ChronosDate('2025-01-20');
+
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, null));
+        $this->assertCount(2, $occurrences);
+        $this->assertEquals('2025-01-20 07:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2025-01-21 07:00', $occurrences[1]->start->format('Y-m-d H:i'));
+    }
+
+    public function testExpandWithOnlyToCutsHead(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2025-01-01'),
+            startTime: new ChronosTime('12:00'),
+            endTimeOrDuration: 'PT45M',
+            timezone: $this->tz
+        );
+
+        $to = new ChronosDate('2025-01-03');
+
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, null, $to));
+        // Dal 1 al 3 inclusi
+        $this->assertGreaterThanOrEqual(3, count($occurrences));
+        $this->assertEquals('2025-01-01 12:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertEquals('2025-01-03 12:00', $occurrences[2]->start->format('Y-m-d H:i'));
+    }
+
     //TODO: test the remaining enum values before 1.0
 
     public function testCombinedFiltersByDayByMonthByMonthDay(): void
@@ -619,9 +774,49 @@ final class ScheduleExpanderTest extends TestCase
 
         $aggregate = new ScheduleAggregate([$s1, $s2]);
 
-        $occurrences = iterator_to_array(ScheduleExpander::expandAggregate($aggregate, $this->holidaysProvider), false);
+        $occurrences = iterator_to_array(ScheduleExpander::expandAggregate($aggregate, $this->holidaysProvider));
 
         $this->assertCount(4, $occurrences);
+        $this->assertEquals('09:00', $occurrences[0]->start->format('H:i'));
+        $this->assertEquals('09:00', $occurrences[1]->start->format('H:i'));
+        $this->assertEquals('14:00', $occurrences[2]->start->format('H:i'));
+        $this->assertEquals('14:00', $occurrences[3]->start->format('H:i'));
+    }
+
+    public function testExpandAggregateGeneratesUniqueKeys(): void
+    {
+        $s1 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 2,
+            timezone: $this->tz
+        );
+
+        $s2 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-05'),
+            startTime: self::chronosTime('14:00'),
+            endTimeOrDuration: 'PT30M',
+            repeatCount: 2,
+            timezone: $this->tz
+        );
+
+        $s3 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-05'),
+            startTime: self::chronosTime('18:00'),
+            endTimeOrDuration: 'PT30M',
+            repeatCount: 2,
+            timezone: $this->tz
+        );
+
+        $aggregate = new ScheduleAggregate([$s1, $s2, $s3]);
+
+        $occurrences = iterator_to_array(ScheduleExpander::expandAggregate($aggregate, $this->holidaysProvider));
+
+        $this->assertCount(6, $occurrences);
     }
 
     public function testExpandAggregateSorted(): void
@@ -744,7 +939,7 @@ final class ScheduleExpanderTest extends TestCase
 
         // With unique = true (default)
         $occurrences = iterator_to_array(
-            ScheduleExpander::expandAggregateSorted($aggregate, $this->holidaysProvider, true, true)
+            ScheduleExpander::expandAggregateSorted($aggregate, $this->holidaysProvider)
         );
 
         $this->assertCount(1, $occurrences); // Only one, duplicate removed
@@ -803,7 +998,7 @@ final class ScheduleExpanderTest extends TestCase
         $aggregate = new ScheduleAggregate([$s1, $s2]);
 
         $occurrences = iterator_to_array(
-            ScheduleExpander::expandAggregateSorted($aggregate, $this->holidaysProvider, true, true)
+            ScheduleExpander::expandAggregateSorted($aggregate, $this->holidaysProvider)
         );
 
         // Should have: 01-01, 01-02, 01-03, 01-04 (no duplicates on 02, 03)
@@ -814,127 +1009,7 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('2025-01-04 09:00', $occurrences[3]->start->format('Y-m-d H:i'));
     }
 
-    public function testExpandUsesFromAsStartWhenScheduleStartMissing(): void
-    {
-        // Schedule senza startDate, ma con durata valida (1h)
-        $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::DAILY,
-            startTime: new ChronosTime('09:00'),
-            endTimeOrDuration: 'PT1H',
-            repeatCount: 3,
-            timezone: $this->tz
-        );
-
-        // Range forzato: 2025-01-10..2025-01-12 (3 giorni)
-        $from = new ChronosDate('2025-01-10');
-        $to   = new ChronosDate('2025-01-12');
-
-        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
-        $this->assertCount(3, $occurrences);
-        $this->assertEquals('2025-01-10 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
-        $this->assertEquals('2025-01-12 09:00', $occurrences[2]->start->format('Y-m-d H:i'));
-    }
-
-    public function testExpandStopsAtToWhenScheduleEndMissing(): void
-    {
-        $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::DAILY,
-            startDate: new ChronosDate('2025-01-01'),
-            startTime: new ChronosTime('08:00'),
-            endTimeOrDuration: 'PT30M',
-            timezone: $this->tz
-        );
-
-        // Range limita l'uscita all'11 gennaio
-        $from = new ChronosDate('2025-01-09');
-        $to   = new ChronosDate('2025-01-11');
-
-        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
-        $this->assertCount(3, $occurrences);
-
-        $this->assertEquals('2025-01-09 08:00', $occurrences[0]->start->format('Y-m-d H:i'));
-        $this->assertEquals('2025-01-10 08:00', $occurrences[1]->start->format('Y-m-d H:i'));
-        $this->assertEquals('2025-01-11 08:00', $occurrences[2]->start->format('Y-m-d H:i'));
-    }
-
-    public function testExpandWithinNarrowWindowYieldsOnlyIntersectingDays(): void
-    {
-        $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::DAILY,
-            startDate: new ChronosDate('2025-01-01'),
-            endDate: new ChronosDate('2025-01-10'),
-            startTime: new ChronosTime('10:00'),
-            endTimeOrDuration: 'PT1H',
-            timezone: $this->tz
-        );
-
-        // Finestra stretta: 2025-01-03..2025-01-04
-        $from = new ChronosDate('2025-01-03');
-        $to   = new ChronosDate('2025-01-04');
-
-        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
-        $this->assertCount(2, $occurrences);
-        $this->assertEquals('2025-01-03 10:00', $occurrences[0]->start->format('Y-m-d H:i'));
-        $this->assertEquals('2025-01-04 10:00', $occurrences[1]->start->format('Y-m-d H:i'));
-    }
-
-    public function testExpandReturnsEmptyWhenWindowBeforeSchedule(): void
-    {
-        $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::DAILY,
-            startDate: new ChronosDate('2025-02-01'),
-            startTime: new ChronosTime('09:00'),
-            endTimeOrDuration: 'PT1H',
-            repeatCount: 5,
-            timezone: $this->tz
-        );
-
-        $from = new ChronosDate('2025-01-01');
-        $to   = new ChronosDate('2025-01-15');
-
-        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
-        $this->assertCount(0, $occurrences);
-    }
-
-    public function testExpandReturnsEmptyWhenWindowAfterSchedule(): void
-    {
-        $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::DAILY,
-            startDate: new ChronosDate('2025-01-01'),
-            endDate: new ChronosDate('2025-01-05'),
-            startTime: new ChronosTime('09:00'),
-            endTimeOrDuration: 'PT1H',
-            timezone: $this->tz
-        );
-
-        $from = new ChronosDate('2025-02-01');
-        $to   = new ChronosDate('2025-02-10');
-
-        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
-        $this->assertCount(0, $occurrences);
-    }
-
-    public function testExpandHonorsByDayWithinWindow(): void
-    {
-        // Finestra di una settimana, ma filtriamo solo lunedì (2 occorrenze nelle 2 settimane)
-        $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::DAILY,
-            startTime: new ChronosTime('09:00'),
-            endTimeOrDuration: 'PT1H',
-            byDay: [DayOfWeek::MONDAY],
-            timezone: $this->tz
-        );
-
-        $from = new ChronosDate('2025-01-06'); // Monday
-        $to   = new ChronosDate('2025-01-13'); // Next Monday
-
-        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, $to));
-        $this->assertCount(2, $occurrences);
-        $this->assertEquals('Monday', $occurrences[0]->start->format('l'));
-        $this->assertEquals('Monday', $occurrences[1]->start->format('l'));
-    }
-
-    public function testAggregateWithWindowMergesOccurrencesFromAllSchedules(): void
+    public function testExpandAggregateWithWindowMergesOccurrencesFromAllSchedules(): void
     {
         $s1 = new Schedule(
             repeatInterval: ScheduleInterval::DAILY,
@@ -966,7 +1041,7 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('14:00', $occurrences[3]->start->format('H:i'));
     }
 
-    public function testAggregateSortedRespectsWindowAndSorting(): void
+    public function testExpandAggregateSortedRespectsWindowAndSorting(): void
     {
         $s1 = new Schedule(
             repeatInterval: ScheduleInterval::DAILY,
@@ -1001,43 +1076,6 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('10:00', $occurrences[1]->start->format('H:i'));
         $this->assertEquals('08:00', $occurrences[2]->start->format('H:i'));
         $this->assertEquals('10:00', $occurrences[3]->start->format('H:i'));
-    }
-
-    public function testExpandWithOnlyFromProducesUnboundedTail(): void
-    {
-        $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::DAILY,
-            startTime: new ChronosTime('07:00'),
-            endTimeOrDuration: 'PT15M',
-            repeatCount: 2,
-            timezone: $this->tz
-        );
-
-        $from = new ChronosDate('2025-01-20');
-
-        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, $from, null));
-        $this->assertCount(2, $occurrences);
-        $this->assertEquals('2025-01-20 07:00', $occurrences[0]->start->format('Y-m-d H:i'));
-        $this->assertEquals('2025-01-21 07:00', $occurrences[1]->start->format('Y-m-d H:i'));
-    }
-
-    public function testExpandWithOnlyToCutsHead(): void
-    {
-        $schedule = new Schedule(
-            repeatInterval: ScheduleInterval::DAILY,
-            startDate: new ChronosDate('2025-01-01'),
-            startTime: new ChronosTime('12:00'),
-            endTimeOrDuration: 'PT45M',
-            timezone: $this->tz
-        );
-
-        $to = new ChronosDate('2025-01-03');
-
-        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider, null, $to));
-        // Dal 1 al 3 inclusi
-        $this->assertGreaterThanOrEqual(3, count($occurrences));
-        $this->assertEquals('2025-01-01 12:00', $occurrences[0]->start->format('Y-m-d H:i'));
-        $this->assertEquals('2025-01-03 12:00', $occurrences[2]->start->format('Y-m-d H:i'));
     }
 
     private static function chronosDate(string $date): ChronosDate

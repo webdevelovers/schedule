@@ -62,16 +62,13 @@ class Schedule implements JsonSerializable
      * @param ChronosTime|null          $startTime
      * The time when each occurrence starts
      * @param ChronosTime|DateInterval|string|null $endTimeOrDuration
-     * The time when each occurrence ends or the duration of the occurrences.
+     * The time when each occurrence ends or the duration of the occurrences as DateInterval or string.
      * @param int|null $repeatCount The maximum number of requested occurrences.
      * @param DayOfWeek[] $byDay Filters by days of the week (e.g., only Mondays and Wednesdays).
      * @param int[] $byMonthDay Filters by days of the month (e.g., 1st, 15th).
      * @param Month[] $byMonth Filters by months of the year (e.g., January, June).
      * @param int[] $byMonthWeek Filters by weeks within the month (e.g., 1 = first week, -1 = last week).
-     * @param ChronosDate[] $exceptDates
-     *    Array of excluded dates or datetimes. If only the date is set,
-     *    all events on that date will be excluded; if datetime, only the
-     *    matching event will be excluded.
+     * @param ChronosDate[] $exceptDates Array of excluded dates or datetimes. Should be inside the startDate and endDate range.
      * @param string|null $timezone The timezone (IANA standard) for all occurrences.
      *
      * @throws ScheduleException
