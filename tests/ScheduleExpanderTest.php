@@ -1078,6 +1078,158 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertEquals('10:00', $occurrences[3]->start->format('H:i'));
     }
 
+    public function testExpandWithFilterSkipsOccurrencesByIndex(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 5,
+            timezone: $this->tz
+        );
+
+        $filter = static function (ScheduleOccurrence $occurrence, Schedule $schedule, int $index): bool {
+            return $index % 2 === 0;
+        };
+
+        $occurrences = iterator_to_array(
+            ScheduleExpander::expand($schedule, $this->holidaysProvider, filter: $filter)
+        );
+
+        $this->assertCount(3, $occurrences);
+        $this->assertEquals('2025-01-01 09:00', $occurrences[0]->start->format('Y-m-d H:i')); // index 0
+        $this->assertEquals('2025-01-03 09:00', $occurrences[1]->start->format('Y-m-d H:i')); // index 2
+        $this->assertEquals('2025-01-05 09:00', $occurrences[2]->start->format('Y-m-d H:i')); // index 4
+    }
+
+    public function testExpandAggregateFilterCanSelectOnlyFirstSchedule(): void
+    {
+        $s1 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 2,
+            timezone: $this->tz
+        );
+
+        $s2 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-03'),
+            startTime: self::chronosTime('14:00'),
+            endTimeOrDuration: 'PT30M',
+            repeatCount: 2,
+            timezone: $this->tz
+        );
+
+        $aggregate = new ScheduleAggregate([$s1, $s2]);
+
+        // Filtro che tiene solo le occorrenze del primo schedule (per identifier)
+        $firstId = $s1->identifier;
+        $filter = static function (ScheduleOccurrence $occurrence, Schedule $schedule, int $index) use ($firstId): bool {
+            return $schedule->identifier === $firstId;
+        };
+
+        $occurrences = iterator_to_array(
+            ScheduleExpander::expandAggregate($aggregate, $this->holidaysProvider, filter: $filter)
+        );
+
+        // Tutte e sole le occorrenze di s1
+        $this->assertCount(2, $occurrences);
+        $this->assertSame('09:00', $occurrences[0]->start->format('H:i'));
+        $this->assertSame('09:00', $occurrences[1]->start->format('H:i'));
+    }
+
+    public function testExpandAggregateFilterIndexIsResetPerSchedule(): void
+    {
+        $s1 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 2,
+            timezone: $this->tz
+        );
+
+        $s2 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-03'),
+            startTime: self::chronosTime('14:00'),
+            endTimeOrDuration: 'PT30M',
+            repeatCount: 2,
+            timezone: $this->tz
+        );
+
+        $aggregate = new ScheduleAggregate([$s1, $s2]);
+
+        // Mantieni solo l'indice 0 di *ogni* schedule
+        $filter = static function (ScheduleOccurrence $occurrence, Schedule $schedule, int $index): bool {
+            return $index === 0;
+        };
+
+        $occurrences = iterator_to_array(
+            ScheduleExpander::expandAggregate($aggregate, $this->holidaysProvider, filter: $filter)
+        );
+
+        // Dovremmo avere esattamente 1 occorrenza per schedule
+        $this->assertCount(2, $occurrences);
+
+        $this->assertEquals('2025-01-01 09:00', $occurrences[0]->start->format('Y-m-d H:i')); // primo di s1
+        $this->assertEquals('2025-01-03 14:00', $occurrences[1]->start->format('Y-m-d H:i')); // primo di s2
+    }
+
+    public function testExpandAggregateSortedAppliesFilterBeforeSorting(): void
+    {
+        $s1 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            startTime: self::chronosTime('08:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 3,
+            timezone: $this->tz
+        );
+
+        $s2 = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            startTime: self::chronosTime('10:00'),
+            endTimeOrDuration: 'PT1H',
+            repeatCount: 3,
+            timezone: $this->tz
+        );
+
+        $aggregate = new ScheduleAggregate([$s1, $s2]);
+
+        // Mantieni solo le occorrenze che iniziano alle 08:00
+        $filter = static function (ScheduleOccurrence $occurrence, Schedule $schedule, int $index): bool {
+            return $occurrence->start->format('H:i') === '08:00';
+        };
+
+        $occurrences = iterator_to_array(
+            ScheduleExpander::expandAggregateSorted(
+                $aggregate,
+                $this->holidaysProvider,
+                ascending: true,
+                unique: true,
+                from: self::chronosDate('2025-01-01'),
+                to: self::chronosDate('2025-01-03'),
+                filter: $filter
+            )
+        );
+
+        // 3 giorni * solo lo schedule delle 08:00
+        $this->assertCount(3, $occurrences);
+        $this->assertEquals('08:00', $occurrences[0]->start->format('H:i'));
+        $this->assertEquals('08:00', $occurrences[1]->start->format('H:i'));
+        $this->assertEquals('08:00', $occurrences[2]->start->format('H:i'));
+
+        // E verifico che siano ordinati per data
+        $this->assertEquals('2025-01-01', $occurrences[0]->start->format('Y-m-d'));
+        $this->assertEquals('2025-01-02', $occurrences[1]->start->format('Y-m-d'));
+        $this->assertEquals('2025-01-03', $occurrences[2]->start->format('Y-m-d'));
+    }
+
     private static function chronosDate(string $date): ChronosDate
     {
         return new ChronosDate($date);

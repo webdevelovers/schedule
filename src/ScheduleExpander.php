@@ -37,10 +37,11 @@ readonly class ScheduleExpander
         HolidayProviderInterface|null $holidaysProvider = null,
         ChronosDate|null $from = null,
         ChronosDate|null $to = null,
+        callable $filter = null,
     ): Generator {
         $index = 0;
         foreach ($aggregate->all() as $schedule) {
-            foreach (self::expand($schedule, $holidaysProvider, $from, $to) as $occurrence) {
+            foreach (self::expand($schedule, $holidaysProvider, $from, $to, $filter) as $occurrence) {
                 $key = $index;
 
                 yield $key => $occurrence;
@@ -66,13 +67,14 @@ readonly class ScheduleExpander
         bool $unique = true,
         ChronosDate|null $from = null,
         ChronosDate|null $to = null,
+        callable $filter = null,
     ): Generator {
         $generators = [];
         $values = [];
 
         // Initialize: create generators and get the first value from each
         foreach ($aggregate->all() as $schedule) {
-            $generator = self::expand($schedule, $holidaysProvider, $from, $to);
+            $generator = self::expand($schedule, $holidaysProvider, $from, $to, $filter);
             if (! $generator->valid()) {
                 continue;
             }
@@ -131,6 +133,7 @@ readonly class ScheduleExpander
         HolidayProviderInterface|null $holidayProvider = null,
         ChronosDate|null $from = null,
         ChronosDate|null $to = null,
+        callable $filter = null,
     ): Generator {
         $timezone = $schedule->timezone;
 
@@ -156,6 +159,7 @@ readonly class ScheduleExpander
         $repeatCount = $schedule->repeatCount;
         $interval = self::scheduleInterval($schedule);
         $endDate = self::calculateEnd($schedule->endDate, $to);
+        $index = 0;
 
         while ($repeatCount === null || $occurrences < $repeatCount) {
             // Exit condition: endDate is present and reached
@@ -197,16 +201,19 @@ readonly class ScheduleExpander
 
             $isHoliday = $holidayProvider && $holidayProvider->isHoliday($current);
 
-            yield new ScheduleOccurrence(
+            $occurrence = new ScheduleOccurrence(
                 start: $startDT,
                 end: $endDT,
                 timezone: $timezone,
                 isHoliday: $isHoliday,
                 scheduleIdentifier: $schedule->identifier,
             );
+            if ($filter === null || $filter($occurrence, $schedule, $index)) {
+                yield $occurrence;
+            }
 
             $occurrences++;
-
+            $index++;
             $current = $current->add($interval);
         }
     }
