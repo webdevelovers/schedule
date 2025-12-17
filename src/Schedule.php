@@ -69,6 +69,7 @@ class Schedule implements JsonSerializable
      * @param Month[] $byMonth Filters by months of the year (e.g., January, June).
      * @param int[] $byMonthWeek Filters by weeks within the month (e.g., 1 = first week, -1 = last week).
      * @param ChronosDate[] $exceptDates Array of excluded dates or datetimes. Should be inside the startDate and endDate range.
+     * @param ChronosDate[] $includeDates Array of explicitly included dates (extra occurrences). Should be inside the startDate and endDate range.
      * @param string|null $timezone The timezone (IANA standard) for all occurrences.
      *
      * @throws ScheduleException
@@ -85,6 +86,7 @@ class Schedule implements JsonSerializable
         public array $byMonth = [],
         public array $byMonthWeek = [],
         public array $exceptDates = [],
+        public array $includeDates = [],
         string|null $timezone = null,
     ) {
         $this->setTimezone($timezone);
@@ -97,6 +99,7 @@ class Schedule implements JsonSerializable
         $this->validateByMonthDay();
         $this->validateByMonthWeek();
         $this->validateExceptDates();
+        $this->validateIncludeDates();
 
         $this->identifier = $this->generateIdentifier();
     }
@@ -113,6 +116,7 @@ class Schedule implements JsonSerializable
             'endDate' => $this->endDate?->format('Y/m/d'),
             'endTime' => $this->endTime?->format('H:i:s'),
             'exceptDates' => array_map(static fn (ChronosDate $chronosDate) => $chronosDate->format('Y/m/d'), $this->exceptDates),
+            'includeDates' => array_map(static fn (ChronosDate $chronosDate) => $chronosDate->format('Y/m/d'), $this->includeDates),
             'repeatCount' => $this->repeatCount,
             'repeatInterval' => $this->repeatInterval->value,
             'startDate' => $this->startDate?->format('Y/m/d'),
@@ -151,6 +155,7 @@ class Schedule implements JsonSerializable
             'byMonth' => $this->byMonth ? array_map(static fn (Month $d) => $d->value, $this->byMonth) : null,
             'byMonthWeek' => $this->byMonthWeek,
             'exceptDates' => array_map(static fn (ChronosDate $chronosDate) => $chronosDate->format('Y/m/d'), $this->exceptDates),
+            'includeDates' => array_map(static fn (ChronosDate $chronosDate) => $chronosDate->format('Y/m/d'), $this->includeDates),
         ];
     }
 
@@ -256,6 +261,17 @@ class Schedule implements JsonSerializable
                 }
             }
 
+            $includeDates = [];
+            if (array_key_exists('includeDates', $data) && $data['includeDates'] !== null) {
+                if (! is_array($data['includeDates'])) {
+                    throw new ScheduleException('"includeDates" must be an array or null.');
+                }
+
+                foreach ($data['includeDates'] as $val) {
+                    $includeDates[] = new ChronosDate((string) $val);
+                }
+            }
+
             return new self(
                 repeatInterval: $repeatInterval,
                 startDate: $startDate,
@@ -268,6 +284,7 @@ class Schedule implements JsonSerializable
                 byMonth: $byMonth,
                 byMonthWeek: $byMonthWeek,
                 exceptDates: $exceptDates,
+                includeDates: $includeDates,
                 timezone: $timezone,
             );
         } catch (Throwable $e) {
@@ -307,6 +324,7 @@ class Schedule implements JsonSerializable
         $this->byMonth = $instance->byMonth;
         $this->byMonthWeek = $instance->byMonthWeek;
         $this->exceptDates = $instance->exceptDates;
+        $this->includeDates = $instance->includeDates;
         $this->identifier = $this->generateIdentifier();
     }
 
@@ -384,6 +402,7 @@ class Schedule implements JsonSerializable
             byMonth: $this->byMonth,
             byMonthWeek: $this->byMonthWeek,
             exceptDates: $this->exceptDates,
+            includeDates: $this->includeDates,
             timezone: $this->timezone->getName(),
         );
     }
@@ -403,6 +422,7 @@ class Schedule implements JsonSerializable
             byMonth: $this->byMonth,
             byMonthWeek: $this->byMonthWeek,
             exceptDates: $this->exceptDates,
+            includeDates: $this->includeDates,
             timezone: $this->timezone->getName(),
         );
     }
@@ -511,6 +531,34 @@ class Schedule implements JsonSerializable
         foreach ($this->exceptDates as $exceptDate) {
             if ($exceptDate->lessThan($this->startDate) || $exceptDate->greaterThan($this->endDate)) {
                 throw new ScheduleException('Some exceptDates are outside the range startDate/endDate.');
+            }
+        }
+    }
+
+    /** @throws ScheduleException */
+    private function validateIncludeDates(): void
+    {
+        foreach ($this->includeDates as $includeDate) {
+            if (! $includeDate instanceof ChronosDate) {
+                throw new ScheduleException('Each "includeDates" element must be an instance of ChronosDate.');
+            }
+        }
+
+        // check for duplicates
+        if (count($this->includeDates) > 0) {
+            $values = array_map(static fn (ChronosDate $d) => $d->format('Y-m-d'), $this->includeDates);
+            if (count(array_unique($values)) < count($values)) {
+                throw new ScheduleException('includeDates should not contain duplicates.');
+            }
+        }
+
+        if (! $this->startDate || ! $this->endDate) {
+            return;
+        }
+
+        foreach ($this->includeDates as $includeDate) {
+            if ($includeDate->lessThan($this->startDate) || $includeDate->greaterThan($this->endDate)) {
+                throw new ScheduleException('Some includeDates are outside the range startDate/endDate.');
             }
         }
     }

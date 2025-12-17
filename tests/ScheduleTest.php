@@ -35,6 +35,7 @@ class ScheduleTest extends TestCase
             byMonth: [Month::JANUARY],
             byMonthWeek: [1, -1],
             exceptDates: [new ChronosDate('2024-01-10')],
+            includeDates: [new ChronosDate('2024-01-12')],
             timezone: $this->tz
         );
 
@@ -50,6 +51,7 @@ class ScheduleTest extends TestCase
             byMonth: [Month::JANUARY],
             byMonthWeek: [1, -1],
             exceptDates: [new ChronosDate('2024-01-10')],
+            includeDates: [new ChronosDate('2024-01-12')],
             timezone: $this->tz
         );
 
@@ -177,7 +179,7 @@ class ScheduleTest extends TestCase
             repeatInterval: ScheduleInterval::DAILY
         );
 
-        $this->assertSame(date_default_timezone_get(), $schedule->timezone->getName());
+        $this->assertSame('UTC', $schedule->timezone->getName());
     }
 
     public function testIsRecurringTrueFalse()
@@ -583,7 +585,7 @@ class ScheduleTest extends TestCase
         $this->assertSame(ScheduleInterval::DAILY->value, $array['repeatInterval']);
         $this->assertNull($array['repeatCount']);
 
-        $this->assertSame(date_default_timezone_get(), $array['timezone']);
+        $this->assertSame($schedule->timezone->getName(), $array['timezone']);
     }
 
     public function testToArrayFromArrayRoundTrip(): void
@@ -595,6 +597,9 @@ class ScheduleTest extends TestCase
         $except = [
             new ChronosDate('2024-08-15'),
             new ChronosDate('2024-08-18')
+        ];
+        $include = [
+            new ChronosDate('2024-08-20'),
         ];
 
         $schedule = new Schedule(
@@ -609,6 +614,7 @@ class ScheduleTest extends TestCase
             byMonth: [Month::AUGUST],
             byMonthWeek: [1],
             exceptDates: $except,
+            includeDates: $include,
             timezone: 'Europe/Rome'
         );
 
@@ -622,6 +628,33 @@ class ScheduleTest extends TestCase
         $this->assertEquals($schedule->startTime, $restored->startTime);
         $this->assertEquals($schedule->endTime, $restored->endTime);
         $this->assertSame($schedule->timezone->getName(), $restored->timezone->getName());
+    }
+
+    public function testIncludeDateOutsideStartEndRangeThrows(): void
+    {
+        $this->expectException(ScheduleException::class);
+
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-08-01'),
+            endDate: new ChronosDate('2024-08-31'),
+            includeDates: [new ChronosDate('2024-09-01')]
+        );
+    }
+
+    public function testIncludeDatesDuplicateThrows(): void
+    {
+        $this->expectException(ScheduleException::class);
+
+        new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate('2024-08-01'),
+            endDate: new ChronosDate('2024-08-31'),
+            includeDates: [
+                new ChronosDate('2024-08-10'),
+                new ChronosDate('2024-08-10'),
+            ]
+        );
     }
 
     public function testFromJsonRoundTrip(): void
@@ -826,6 +859,7 @@ class ScheduleTest extends TestCase
             'byMonth' => null,
             'byMonthWeek' => null,
             'exceptDates' => null,
+            'includeDates' => null,
         ];
 
         $schedule = Schedule::fromArray($array);

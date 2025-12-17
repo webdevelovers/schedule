@@ -323,4 +323,23 @@ class ScheduleHumanizerTest extends TestCase
         $this->assertStringContainsString('2 ore', $parts['time-interval']);
         $this->assertStringContainsString('30 minuti', $parts['time-interval']);
     }
+
+    public function testIncludeDates()
+    {
+        $now = new DateTimeImmutable('2024-01-01');
+        $include = $now->modify('+2 days');
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: new ChronosDate($now),
+            includeDates: [new ChronosDate($include)]
+        );
+
+        $humanizer = new ScheduleHumanizer($schedule, $this->getTranslator());
+        $parts = $humanizer->humanize();
+
+        $this->assertTrue(
+            in_array('inclusi 03/01/2024', $parts, true) ||
+            in_array('inclusi ' . $include->format('d/m/Y'), $parts, true)
+        );
+    }
 }

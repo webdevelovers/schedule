@@ -1068,10 +1068,8 @@ final class ScheduleExpanderTest extends TestCase
             ScheduleExpander::expandAggregateSorted($agg, $this->holidaysProvider, true, true, $from, $to)
         );
 
-        // 2 giorni * 2 schedules = 4 occorrenze
         $this->assertCount(4, $occurrences);
 
-        // Ordinati per start ascendente (08:00,10:00) per ciascun giorno
         $this->assertEquals('08:00', $occurrences[0]->start->format('H:i'));
         $this->assertEquals('10:00', $occurrences[1]->start->format('H:i'));
         $this->assertEquals('08:00', $occurrences[2]->start->format('H:i'));
@@ -1125,7 +1123,6 @@ final class ScheduleExpanderTest extends TestCase
 
         $aggregate = new ScheduleAggregate([$s1, $s2]);
 
-        // Filtro che tiene solo le occorrenze del primo schedule (per identifier)
         $firstId = $s1->identifier;
         $filter = static function (ScheduleOccurrence $occurrence, Schedule $schedule, int $index) use ($firstId): bool {
             return $schedule->identifier === $firstId;
@@ -1135,7 +1132,6 @@ final class ScheduleExpanderTest extends TestCase
             ScheduleExpander::expandAggregate($aggregate, $this->holidaysProvider, filter: $filter)
         );
 
-        // Tutte e sole le occorrenze di s1
         $this->assertCount(2, $occurrences);
         $this->assertSame('09:00', $occurrences[0]->start->format('H:i'));
         $this->assertSame('09:00', $occurrences[1]->start->format('H:i'));
@@ -1163,7 +1159,6 @@ final class ScheduleExpanderTest extends TestCase
 
         $aggregate = new ScheduleAggregate([$s1, $s2]);
 
-        // Mantieni solo l'indice 0 di *ogni* schedule
         $filter = static function (ScheduleOccurrence $occurrence, Schedule $schedule, int $index): bool {
             return $index === 0;
         };
@@ -1172,7 +1167,6 @@ final class ScheduleExpanderTest extends TestCase
             ScheduleExpander::expandAggregate($aggregate, $this->holidaysProvider, filter: $filter)
         );
 
-        // Dovremmo avere esattamente 1 occorrenza per schedule
         $this->assertCount(2, $occurrences);
 
         $this->assertEquals('2025-01-01 09:00', $occurrences[0]->start->format('Y-m-d H:i')); // primo di s1
@@ -1201,15 +1195,14 @@ final class ScheduleExpanderTest extends TestCase
 
         $aggregate = new ScheduleAggregate([$s1, $s2]);
 
-        // Mantieni solo le occorrenze che iniziano alle 08:00
         $filter = static function (ScheduleOccurrence $occurrence, Schedule $schedule, int $index): bool {
             return $occurrence->start->format('H:i') === '08:00';
         };
 
         $occurrences = iterator_to_array(
             ScheduleExpander::expandAggregateSorted(
-                $aggregate,
-                $this->holidaysProvider,
+                aggregate: $aggregate,
+                holidaysProvider: $this->holidaysProvider,
                 ascending: true,
                 unique: true,
                 from: self::chronosDate('2025-01-01'),
@@ -1218,16 +1211,56 @@ final class ScheduleExpanderTest extends TestCase
             )
         );
 
-        // 3 giorni * solo lo schedule delle 08:00
         $this->assertCount(3, $occurrences);
         $this->assertEquals('08:00', $occurrences[0]->start->format('H:i'));
         $this->assertEquals('08:00', $occurrences[1]->start->format('H:i'));
         $this->assertEquals('08:00', $occurrences[2]->start->format('H:i'));
 
-        // E verifico che siano ordinati per data
         $this->assertEquals('2025-01-01', $occurrences[0]->start->format('Y-m-d'));
         $this->assertEquals('2025-01-02', $occurrences[1]->start->format('Y-m-d'));
         $this->assertEquals('2025-01-03', $occurrences[2]->start->format('Y-m-d'));
+    }
+
+    public function testDailyIncludeDatesBypassesFilters(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2024-01-01'),
+            endDate: self::chronosDate('2024-01-05'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: self::chronosTime('10:00'),
+            byDay: [DayOfWeek::MONDAY],
+            includeDates: [self::chronosDate('2024-01-03')],
+            timezone: $this->tz
+        );
+
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
+
+        $this->assertNotEmpty($occurrences);
+
+        $dates = array_map(static fn (ScheduleOccurrence $o) => $o->start->format('Y-m-d'), $occurrences);
+
+        $this->assertContains('2024-01-01', $dates);
+        $this->assertContains('2024-01-03', $dates);
+    }
+
+    public function testIncludeDatesOverridesExceptDatesOnSameDay(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2024-01-01'),
+            endDate: self::chronosDate('2024-01-03'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: self::chronosTime('10:00'),
+            exceptDates: [self::chronosDate('2024-01-02')],
+            includeDates: [self::chronosDate('2024-01-02')],
+            timezone: $this->tz
+        );
+
+        $occurrences = iterator_to_array(ScheduleExpander::expand($schedule, $this->holidaysProvider));
+        $dates = array_map(static fn (ScheduleOccurrence $o) => $o->start->format('Y-m-d'), $occurrences);
+
+        $this->assertContains('2024-01-02', $dates);
     }
 
     private static function chronosDate(string $date): ChronosDate

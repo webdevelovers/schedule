@@ -7,6 +7,7 @@ namespace WebDevelovers\Schedule;
 use Cake\Chronos\ChronosDate;
 use Cake\Chronos\ChronosTime;
 use DateTimeInterface;
+use DateTimeZone;
 use JsonException;
 use JsonSerializable;
 use Throwable;
@@ -50,13 +51,14 @@ class ScheduleAggregate implements JsonSerializable
     public function toArray(): array
     {
         [$minStart, $maxEnd] = $this->getBounds();
+        $utc = new DateTimeZone('UTC');
 
         return [
             'type' => 'ScheduleAggregate',
             'schedules' => array_map(static fn (Schedule $s) => $s->toArray(), $this->schedules),
             'bounds' => [
-                'startDate' => $minStart?->format(DateTimeInterface::ATOM),
-                'endDate' => $maxEnd?->format(DateTimeInterface::ATOM),
+                'startDate' => $minStart ? $minStart->toDateTimeImmutable($utc)->format(DateTimeInterface::ATOM) : null,
+                'endDate' => $maxEnd ? $maxEnd->toDateTimeImmutable($utc)->format(DateTimeInterface::ATOM) : null,
             ],
         ];
     }

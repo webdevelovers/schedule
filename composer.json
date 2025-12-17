@@ -9,7 +9,13 @@
       "email": "simone@webdevelovers.org"
     }
   ],
-  "keywords" : ["event","calendar","recurring","schedule","schema.org"],
+  "keywords": [
+    "event",
+    "calendar",
+    "recurring",
+    "schedule",
+    "schema.org"
+  ],
   "require": {
     "php": ">=8.3.0",
     "cakephp/chronos": "^3.0"

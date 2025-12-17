@@ -167,29 +167,32 @@ readonly class ScheduleExpander
                 break;
             }
 
-            if (self::byDayFilterIsApplied($schedule, $current)) {
-                $current = $current->add($interval);
-                continue;
-            }
+            $isExplicitlyIncluded = self::isIncludedDate($schedule, $current);
+            if (! $isExplicitlyIncluded) {
+                if (self::byDayFilterIsApplied($schedule, $current)) {
+                    $current = $current->add($interval);
+                    continue;
+                }
 
-            if (self::byMonthFilterIsApplied($schedule, $current)) {
-                $current = $current->add($interval);
-                continue;
-            }
+                if (self::byMonthFilterIsApplied($schedule, $current)) {
+                    $current = $current->add($interval);
+                    continue;
+                }
 
-            if (self::byMontDayFilterIsApplied($schedule, $current)) {
-                $current = $current->add($interval);
-                continue;
-            }
+                if (self::byMontDayFilterIsApplied($schedule, $current)) {
+                    $current = $current->add($interval);
+                    continue;
+                }
 
-            if (self::byMonthWeekFilterIsApplied($schedule, $current)) {
-                $current = $current->add($interval);
-                continue;
-            }
+                if (self::byMonthWeekFilterIsApplied($schedule, $current)) {
+                    $current = $current->add($interval);
+                    continue;
+                }
 
-            if (self::isExcludedDate($schedule, $current)) {
-                $current = $current->add($interval);
-                continue;
+                if (self::isExcludedDate($schedule, $current)) {
+                    $current = $current->add($interval);
+                    continue;
+                }
             }
 
             $startDT = self::composeStart($current, $schedule->startTime, $timezone);
@@ -294,6 +297,20 @@ readonly class ScheduleExpander
             if (
                 $except->format('Y-m-d H:i') === $current->format('Y-m-d H:i') ||
                 $except->format('Y-m-d') === $current->format('Y-m-d')
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function isIncludedDate(Schedule $schedule, ChronosDate $current): bool
+    {
+        foreach ($schedule->includeDates as $include) {
+            if (
+                $include->format('Y-m-d H:i') === $current->format('Y-m-d H:i') ||
+                $include->format('Y-m-d') === $current->format('Y-m-d')
             ) {
                 return true;
             }

@@ -43,6 +43,13 @@ readonly class ScheduleHumanizer
         $this->humanizeInterval($parts);
         $this->humanizeFilters($parts);
 
+        // Inclusions
+        if (count($this->schedule->includeDates) > 0) {
+            $dates = array_map(static fn (ChronosDate $d) => self::formatDate($d), $this->schedule->includeDates);
+            $dates = implode(', ', $dates);
+            $parts['include-dates'] = self::translate($translator, 'schedule.include', ['%dates%' => $dates], $locale);
+        }
+
         // Exclusions
         if (count($this->schedule->exceptDates) > 0) {
             $dates = array_map(static fn (ChronosDate $d) => self::formatDate($d), $this->schedule->exceptDates);
