@@ -19,6 +19,7 @@ A `Schedule` can be configured with:
 - an optional start/end window
 - optional filters (days of week, month days, months, weeks of month)
 - optional exceptions (dates to be skipped)
+- optional inclusions (explicit dates to add as extra occurrences)
 
 It is inspired by concepts from [RFC 5545](https://www.rfc-editor.org/rfc/rfc5545)
 (iCalendar) and [schema.org/Schedule](https://schema.org/Schedule), but kept deliberately simpler and PHP‑friendly.
@@ -35,8 +36,8 @@ The expander:
 
 - uses `repeatInterval` and `startDate`/`endDate` together with the `from`/`to`
   window to decide which dates to consider,
-- applies `byDay`, `byMonth`, `byMonthDay`, `byMonthWeek`, and `exceptDates`
-  as filters,
+- applies `byDay`, `byMonth`, `byMonthDay`, `byMonthWeek`, `exceptDates`, and `includeDates`
+  as filters/inclusions,
 - builds `ScheduleOccurrence` instances with computed start/end datetimes and
   holiday flags.
 
@@ -61,11 +62,12 @@ The expander:
     - `NONE`               → non‑recurring (single occurrence if other fields are valid)
 
   > Important: `EVERY_WEEK` does **not** mean “every Tuesday” or “every Wednesday”.
-  > It means: starting from the initial date, occurrences are spaced by a fixed interval
+  > It means: starting from **the initial date, occurrences are spaced by a fixed interval
   > of 7 days. To express “every Tuesday” (or “every Monday and Wednesday”), you use:
   >
   > - `repeatInterval: ScheduleInterval::DAILY`, **plus**
   > - `byDay: [DayOfWeek::TUESDAY]` (or multiple `DayOfWeek` values).
+  > - **a tuesday as an initial date** - otherwise no occurrences will be generated.`
 
   Internally, `ScheduleInterval::toISO8601()` returns the ISO‑8601 string for the
   fixed interval, which is then used to build the underlying `DateInterval`.
@@ -132,6 +134,19 @@ The expander:
   When both `startDate` and `endDate` are set, each `exceptDates` element must fall
   within `[startDate, endDate]` (inclusive), otherwise a `ScheduleException` is thrown.
   When only one of `startDate` or `endDate` is set, the range check is skipped.
+
+- **`includeDates`** (`ChronosDate[]`)  
+  List of explicitly included dates (extra occurrences).  
+  This can be used to add “one-off” dates on top of the normal recurrence rules.  
+  Validation rules:
+  - each element must be a `ChronosDate`
+  - duplicates are not allowed
+  - when both `startDate` and `endDate` are set, each included date must fall within
+    `[startDate, endDate]` (inclusive)
+
+  > Note: if the same date is both included and excluded (present in `includeDates`
+  > and `exceptDates`), the effective outcome depends on the expander’s precedence rules.
+  > If you need deterministic behavior, avoid overlapping entries.
 
 - **`timezone`** (`string|null`)  
   IANA timezone name used for all occurrences (e.g. `"UTC"`, `"Europe/Rome"`).  

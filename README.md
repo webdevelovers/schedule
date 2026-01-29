@@ -19,6 +19,8 @@ The library uses [Chronos](https://github.com/cakephp/chronos) for dates and tim
 (`ChronosDate` and `ChronosTime`), in order to work with immutable, time‑zone‑aware
 objects and avoid global state.
 
+The library is heavilty inspired by [Recurrence Rules](https://tools.ietf.org/html/rfc5545#section-3.3.10)
+and [Schema.org](https://schema.org/Schedule)
 ---
 
 ## Quick Start
