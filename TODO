@@ -1,0 +1,2 @@
+# relax the requirements of "times" to allow the creation of a schedule returning
+"day" occurrences

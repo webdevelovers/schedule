@@ -37,7 +37,7 @@ readonly class ScheduleExpander
         HolidayProviderInterface|null $holidaysProvider = null,
         ChronosDate|null $from = null,
         ChronosDate|null $to = null,
-        callable $filter = null,
+        callable|null $filter = null,
     ): Generator {
         $index = 0;
         foreach ($aggregate->all() as $schedule) {
@@ -67,7 +67,7 @@ readonly class ScheduleExpander
         bool $unique = true,
         ChronosDate|null $from = null,
         ChronosDate|null $to = null,
-        callable $filter = null,
+        callable|null $filter = null,
     ): Generator {
         $generators = [];
         $values = [];
@@ -133,7 +133,7 @@ readonly class ScheduleExpander
         HolidayProviderInterface|null $holidayProvider = null,
         ChronosDate|null $from = null,
         ChronosDate|null $to = null,
-        callable $filter = null,
+        callable|null $filter = null,
     ): Generator {
         $timezone = $schedule->timezone;
 
