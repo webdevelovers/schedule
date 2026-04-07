@@ -28,7 +28,7 @@ readonly class ScheduleExpander
     /**
      * Expands a ScheduleAggregate into all occurrences from all schedules
      *
-     * @return Generator<ScheduleOccurrence>
+     * @return Generator<ScheduleOccurrenceInterface>
      *
      * @throws ScheduleExpandException
      */
@@ -56,7 +56,7 @@ readonly class ScheduleExpander
      * Returns a generator for memory efficiency while maintaining global sort order.
      * Uses k-way merge algorithm. Guarantees unique occurrences.
      *
-     * @return Generator<ScheduleOccurrence>
+     * @return Generator<ScheduleOccurrenceInterface>
      *
      * @throws ScheduleExpandException
      */
@@ -90,7 +90,7 @@ readonly class ScheduleExpander
             // Find the index of the minimum (or maximum if descending) value
             $minIndex = 0;
             for ($i = 1; $i < count($values); $i++) {
-                $comparison = $values[$i]->start <=> $values[$minIndex]->start;
+                $comparison = self::occurrenceSortKey($values[$i]) <=> self::occurrenceSortKey($values[$minIndex]);
                 if ((! $ascending || $comparison >= 0) && ($ascending || $comparison <= 0)) {
                     continue;
                 }
@@ -124,7 +124,7 @@ readonly class ScheduleExpander
     }
 
     /**
-     * @return Generator<ScheduleOccurrence>
+     * @return Generator<ScheduleOccurrenceInterface>
      *
      * @throws ScheduleExpandException
      */
@@ -135,8 +135,6 @@ readonly class ScheduleExpander
         ChronosDate|null $to = null,
         callable|null $filter = null,
     ): Generator {
-        $timezone = $schedule->timezone;
-
         $start = self::calculateStart($schedule->startDate, $from);
         if ($start === null) {
             return;
@@ -148,12 +146,28 @@ readonly class ScheduleExpander
             return;
         }
 
-        // TODO: review
-        // For recurring schedules, we need either endTime or duration to create occurrences
-        if ($schedule->endTime === null && $schedule->duration === null) {
+        if ($schedule->startTime === null && $schedule->endTime === null && $schedule->duration === null) {
+            if ($schedule->repeatCount === null && $schedule->endDate === null) {
+                return;
+            }
+
+            yield from self::expandDateOnly($schedule, $holidayProvider, $from, $to, $filter);
+
             return;
         }
 
+        // For recurring schedules, we need either endTime or duration to create occurrences
+        if (
+            (
+                $schedule->startTime !== null && ($schedule->endTime === null && $schedule->duration === null)
+            ) || (
+                ($schedule->endTime !== null || $schedule->duration !== null) && $schedule->startTime === null
+            )
+        ) {
+            return;
+        }
+
+        $timezone = $schedule->timezone;
         $current = $start;
         $occurrences = 0;
         $repeatCount = $schedule->repeatCount;
@@ -167,44 +181,16 @@ readonly class ScheduleExpander
                 break;
             }
 
-            $isExplicitlyIncluded = self::isIncludedDate($schedule, $current);
-            if (! $isExplicitlyIncluded) {
-                if (self::byDayFilterIsApplied($schedule, $current)) {
-                    $current = $current->add($interval);
-                    continue;
-                }
-
-                if (self::byMonthFilterIsApplied($schedule, $current)) {
-                    $current = $current->add($interval);
-                    continue;
-                }
-
-                if (self::byMontDayFilterIsApplied($schedule, $current)) {
-                    $current = $current->add($interval);
-                    continue;
-                }
-
-                if (self::byMonthWeekFilterIsApplied($schedule, $current)) {
-                    $current = $current->add($interval);
-                    continue;
-                }
-
-                if (self::isExcludedDate($schedule, $current)) {
-                    $current = $current->add($interval);
-                    continue;
-                }
+            if (! self::shouldIncludeDate($schedule, $current)) {
+                $current = $current->add($interval);
+                continue;
             }
 
             $startDT = self::composeStart($current, $schedule->startTime, $timezone);
-            $endDT = self::composeEnd($startDT, $current, $schedule->startTime, $schedule->endTime, $schedule->duration, $timezone);
-
-            if ($endDT === null) {
-                $endDT = $startDT;
-            }
-
+            $endDT = self::composeEnd($startDT, $current, $schedule->startTime, $schedule->endTime, $schedule->duration, $timezone) ?? $startDT;
             $isHoliday = $holidayProvider && $holidayProvider->isHoliday($current);
 
-            $occurrence = new ScheduleOccurrence(
+            $occurrence = new ScheduleDateTimeOccurrence(
                 start: $startDT,
                 end: $endDT,
                 timezone: $timezone,
@@ -219,6 +205,85 @@ readonly class ScheduleExpander
             $index++;
             $current = $current->add($interval);
         }
+    }
+
+    /**
+     * @return Generator<ScheduleOccurrenceInterface>
+     *
+     * @throws ScheduleExpandException
+     */
+    private static function expandDateOnly(
+        Schedule $schedule,
+        HolidayProviderInterface|null $holidayProvider,
+        ChronosDate|null $from,
+        ChronosDate|null $to,
+        callable|null $filter,
+    ): Generator {
+        $start = self::calculateStart($schedule->startDate, $from);
+        if ($start === null) {
+            return;
+        }
+
+        $current = $start;
+        $occurrences = 0;
+        $repeatCount = $schedule->repeatCount;
+        $interval = self::scheduleInterval($schedule);
+        $endDate = self::calculateEnd($schedule->endDate, $to);
+        $index = 0;
+
+        while ($repeatCount === null || $occurrences < $repeatCount) {
+            if ($endDate !== null && $current->greaterThan($endDate)) {
+                break;
+            }
+
+            if (! self::shouldIncludeDate($schedule, $current)) {
+                $current = $current->add($interval);
+                continue;
+            }
+
+            $isHoliday = $holidayProvider && $holidayProvider->isHoliday($current);
+
+            $occurrence = new ScheduleDateOccurrence(
+                date: $current,
+                timezone: $schedule->timezone,
+                isHoliday: $isHoliday,
+                scheduleIdentifier: $schedule->identifier,
+            );
+
+            if ($filter === null || $filter($occurrence, $schedule, $index)) {
+                yield $occurrence;
+            }
+
+            $occurrences++;
+            $index++;
+            $current = $current->add($interval);
+        }
+    }
+
+    private static function shouldIncludeDate(Schedule $schedule, ChronosDate $current): bool
+    {
+        $isExplicitlyIncluded = self::isIncludedDate($schedule, $current);
+        if ($isExplicitlyIncluded) {
+            return true;
+        }
+
+        if (self::byDayFilterIsApplied($schedule, $current)) {
+            return false;
+        }
+
+        if (self::byMonthFilterIsApplied($schedule, $current)) {
+            return false;
+        }
+
+        if (self::byMontDayFilterIsApplied($schedule, $current)) {
+            return false;
+        }
+
+        if (self::byMonthWeekFilterIsApplied($schedule, $current)) {
+            return false;
+        }
+
+        return ! self::isExcludedDate($schedule, $current);
     }
 
     private static function calculateStart(ChronosDate|null $startDate, ChronosDate|null $from): ChronosDate|null
@@ -255,11 +320,11 @@ readonly class ScheduleExpander
     private static function byMonthFilterIsApplied(Schedule $schedule, ChronosDate $current): bool
     {
         return ! empty($schedule->byMonth) &&
-                ! in_array(
-                    Month::fromNumber((int) $current->format('n')),
-                    $schedule->byMonth,
-                    true,
-                );
+            ! in_array(
+                Month::fromNumber((int) $current->format('n')),
+                $schedule->byMonth,
+                true,
+            );
     }
 
     private static function byMontDayFilterIsApplied(Schedule $schedule, ChronosDate $current): bool
@@ -324,22 +389,40 @@ readonly class ScheduleExpander
         Schedule $schedule,
         HolidayProviderInterface|null $holidaysProvider = null,
     ): Generator {
-        if (
-            $schedule->startDate === null ||
-            ($schedule->startTime === null && $schedule->endTime === null)
-        ) {
+        if ($schedule->startDate === null) {
             return;
         }
 
         $timezone = $schedule->timezone;
         $currentDate = $schedule->startDate;
-
-        $startDT = self::composeStart($currentDate, $schedule->startTime, $timezone);
-        $endDT = self::composeEnd($startDT, $currentDate, $schedule->startTime, $schedule->endTime, $schedule->duration, $timezone) ?? $startDT;
-
         $isHoliday = $holidaysProvider && $holidaysProvider->isHoliday($currentDate);
 
-        yield new ScheduleOccurrence(
+        if ($schedule->startTime === null && $schedule->endTime === null && $schedule->duration === null) {
+            yield new ScheduleDateOccurrence(
+                date: $currentDate,
+                timezone: $timezone,
+                isHoliday: $isHoliday,
+                scheduleIdentifier: $schedule->identifier,
+            );
+
+            return;
+        }
+
+        if (($schedule->endTime !== null || $schedule->duration !== null) && $schedule->startTime === null) {
+            return;
+        }
+
+        $startDT = self::composeStart($currentDate, $schedule->startTime, $timezone);
+        $endDT = self::composeEnd(
+            $startDT,
+            $currentDate,
+            $schedule->startTime,
+            $schedule->endTime,
+            $schedule->duration,
+            $timezone
+        ) ?? $startDT;
+
+        yield new ScheduleDateTimeOccurrence(
             start: $startDT,
             end: $endDT,
             timezone: $timezone,
@@ -409,9 +492,31 @@ readonly class ScheduleExpander
         }
     }
 
-    /** Creates a unique key for an occurrence based on start and end datetime */
-    private static function occurrenceKey(ScheduleOccurrence $occurrence): string
+    /** Creates a unique key for an occurrence based on its temporal identity */
+    private static function occurrenceKey(ScheduleOccurrenceInterface $occurrence): string
     {
-        return $occurrence->start->format('Y-m-d H:i:s') . '|' . $occurrence->end->format('Y-m-d H:i:s');
+        if ($occurrence instanceof ScheduleDateOccurrence) {
+            return 'date|' . $occurrence->date->format('Y-m-d');
+        }
+
+        if ($occurrence instanceof ScheduleDateTimeOccurrence) {
+            return 'datetime|' . $occurrence->start->format('Y-m-d H:i:s') . '|' . $occurrence->end->format('Y-m-d H:i:s');
+        }
+
+        return 'unknown';
     }
+
+    private static function occurrenceSortKey(ScheduleOccurrenceInterface $occurrence): string
+    {
+        if ($occurrence instanceof ScheduleDateOccurrence) {
+            return $occurrence->date->format('Y-m-d') . ' 00:00:00';
+        }
+
+        if ($occurrence instanceof ScheduleDateTimeOccurrence) {
+            return $occurrence->start->format('Y-m-d H:i:s');
+        }
+
+        return '';
+    }
+
 }

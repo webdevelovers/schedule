@@ -10,7 +10,7 @@ use DateTimeZone;
 
 use const DATE_ATOM;
 
-readonly class ScheduleOccurrence
+readonly class ScheduleDateTimeOccurrence implements ScheduleOccurrenceInterface
 {
     public DateInterval $duration;
 
@@ -24,15 +24,32 @@ readonly class ScheduleOccurrence
         $this->duration = $start->diff($end);
     }
 
+    public function getTimezone(): DateTimeZone
+    {
+        return $this->timezone;
+    }
+
+    public function isHoliday(): bool
+    {
+        return $this->isHoliday;
+    }
+
+    public function getScheduleIdentifier(): string
+    {
+        return $this->scheduleIdentifier;
+    }
+
     /** @return array<string, string|null> */
     public function toArray(): array
     {
         return [
+            'type' => 'datetime',
             'start' => $this->start->format(DATE_ATOM),
             'end' => $this->end->format(DATE_ATOM),
             'duration' => $this->duration->format('P%yY%mM%dDT%hH%iM%sS'),
             'timezone' => $this->timezone->getName(),
             'isHoliday' => $this->isHoliday ? 'true' : 'false',
+            'scheduleIdentifier' => $this->scheduleIdentifier,
         ];
     }
 
