@@ -124,6 +124,53 @@ readonly class ScheduleExpander
     }
 
     /**
+     * Checks whether at least one occurrence is present on the specified date.
+     * For datetime occurrences, this method considers overlaps (e.g. overnight events).
+     *
+     * @throws ScheduleExpandException
+     */
+    public static function occursOnDate(
+        Schedule $schedule,
+        ChronosDate $date,
+        HolidayProviderInterface|null $holidayProvider = null,
+    ): bool {
+        foreach (self::occurrencesInDateRange($schedule, $date, $date, $holidayProvider) as $occurrence) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns occurrences that are present in the inclusive date range.
+     * For datetime occurrences, this method includes events overlapping the range.
+     *
+     * @return Generator<ScheduleOccurrenceInterface>
+     *
+     * @throws ScheduleExpandException
+     */
+    public static function occurrencesInDateRange(
+        Schedule $schedule,
+        ChronosDate $from,
+        ChronosDate $to,
+        HolidayProviderInterface|null $holidayProvider = null,
+    ): Generator {
+        if ($to->lessThan($from)) {
+            return;
+        }
+
+        $expansionFrom = self::occurrenceRangeStartDate($schedule, $from);
+
+        foreach (self::expand($schedule, $holidayProvider, $expansionFrom, $to) as $occurrence) {
+            if (! self::occurrenceIntersectsDateRange($occurrence, $from, $to)) {
+                continue;
+            }
+
+            yield $occurrence;
+        }
+    }
+
+    /**
      * @return Generator<ScheduleOccurrenceInterface>
      *
      * @throws ScheduleExpandException
@@ -517,6 +564,45 @@ readonly class ScheduleExpander
         }
 
         return '';
+    }
+
+    private static function occurrenceRangeStartDate(Schedule $schedule, ChronosDate $from): ChronosDate
+    {
+        if ($schedule->duration === null) {
+            return $from;
+        }
+
+        $fromDateTime = new DateTimeImmutable($from->format('Y-m-d 00:00:00'), new DateTimeZone('UTC'));
+        $shifted = $fromDateTime->sub($schedule->duration);
+
+        return new ChronosDate($shifted->format('Y-m-d'));
+    }
+
+    private static function occurrenceIntersectsDateRange(
+        ScheduleOccurrenceInterface $occurrence,
+        ChronosDate $from,
+        ChronosDate $to,
+    ): bool {
+        if ($occurrence instanceof ScheduleDateOccurrence) {
+            return ! $occurrence->date->lessThan($from) && ! $occurrence->date->greaterThan($to);
+        }
+
+        if ($occurrence instanceof ScheduleDateTimeOccurrence) {
+            [$rangeStart, $rangeEnd] = self::dateRangeBoundaries($from, $to, $occurrence->timezone);
+
+            return $occurrence->end >= $rangeStart && $occurrence->start <= $rangeEnd;
+        }
+
+        return false;
+    }
+
+    /** @return array{0: DateTimeImmutable, 1: DateTimeImmutable} */
+    private static function dateRangeBoundaries(ChronosDate $from, ChronosDate $to, DateTimeZone $timezone): array
+    {
+        $rangeStart = new DateTimeImmutable($from->format('Y-m-d 00:00:00'), $timezone);
+        $rangeEnd = new DateTimeImmutable($to->format('Y-m-d 23:59:59'), $timezone);
+
+        return [$rangeStart, $rangeEnd];
     }
 
 }

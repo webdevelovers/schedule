@@ -1629,6 +1629,155 @@ final class ScheduleExpanderTest extends TestCase
         $this->assertContains('2024-01-02', $dates);
     }
 
+    public function testOccursOnDateReturnsTrueForDateOnlyOccurrence(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            endDate: self::chronosDate('2025-01-03'),
+            timezone: $this->tz
+        );
+
+        $result = ScheduleExpander::occursOnDate(
+            schedule: $schedule,
+            date: self::chronosDate('2025-01-02'),
+            holidayProvider: $this->holidaysProvider
+        );
+
+        $this->assertTrue($result);
+    }
+
+    public function testOccursOnDateReturnsFalseWhenDateIsNotAnOccurrence(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            endDate: self::chronosDate('2025-01-05'),
+            byDay: [DayOfWeek::MONDAY],
+            timezone: $this->tz
+        );
+
+        $result = ScheduleExpander::occursOnDate(
+            schedule: $schedule,
+            date: self::chronosDate('2025-01-02'),
+            holidayProvider: $this->holidaysProvider
+        );
+
+        $this->assertFalse($result);
+    }
+
+    public function testOccursOnDateReturnsTrueForOvernightDateTimeOccurrence(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::NONE,
+            startDate: self::chronosDate('2025-01-01'),
+            startTime: self::chronosTime('23:00'),
+            endTimeOrDuration: self::chronosTime('01:00'),
+            timezone: $this->tz
+        );
+
+        $result = ScheduleExpander::occursOnDate(
+            schedule: $schedule,
+            date: self::chronosDate('2025-01-02'),
+            holidayProvider: $this->holidaysProvider
+        );
+
+        $this->assertTrue($result);
+    }
+
+    public function testOccurrencesInDateRangeReturnsDateOnlyOccurrencesInInclusiveRange(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            endDate: self::chronosDate('2025-01-05'),
+            timezone: $this->tz
+        );
+
+        $occurrences = iterator_to_array(
+            ScheduleExpander::occurrencesInDateRange(
+                schedule: $schedule,
+                from: self::chronosDate('2025-01-02'),
+                to: self::chronosDate('2025-01-04'),
+                holidayProvider: $this->holidaysProvider
+            )
+        );
+
+        $this->assertCount(3, $occurrences);
+        $this->assertSame('2025-01-02', $occurrences[0]->date->format('Y-m-d'));
+        $this->assertSame('2025-01-03', $occurrences[1]->date->format('Y-m-d'));
+        $this->assertSame('2025-01-04', $occurrences[2]->date->format('Y-m-d'));
+    }
+
+    public function testOccurrencesInDateRangeReturnsEmptyWhenRangeIsInvalid(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            endDate: self::chronosDate('2025-01-05'),
+            timezone: $this->tz
+        );
+
+        $occurrences = iterator_to_array(
+            ScheduleExpander::occurrencesInDateRange(
+                schedule: $schedule,
+                from: self::chronosDate('2025-01-05'),
+                to: self::chronosDate('2025-01-02'),
+                holidayProvider: $this->holidaysProvider
+            )
+        );
+
+        $this->assertSame([], $occurrences);
+    }
+
+    public function testOccurrencesInDateRangeIncludesDateTimeOccurrenceOverlappingRangeStart(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::DAILY,
+            startDate: self::chronosDate('2025-01-01'),
+            endDate: self::chronosDate('2025-01-03'),
+            startTime: self::chronosTime('22:00'),
+            endTimeOrDuration: 'PT4H',
+            timezone: $this->tz
+        );
+
+        $occurrences = iterator_to_array(
+            ScheduleExpander::occurrencesInDateRange(
+                schedule: $schedule,
+                from: self::chronosDate('2025-01-02'),
+                to: self::chronosDate('2025-01-02'),
+                holidayProvider: $this->holidaysProvider
+            )
+        );
+
+        $this->assertCount(2, $occurrences);
+        $this->assertSame('2025-01-01 22:00', $occurrences[0]->start->format('Y-m-d H:i'));
+        $this->assertSame('2025-01-02 22:00', $occurrences[1]->start->format('Y-m-d H:i'));
+    }
+
+    public function testOccurrencesInDateRangeIncludesSingleNonRecurringOccurrence(): void
+    {
+        $schedule = new Schedule(
+            repeatInterval: ScheduleInterval::NONE,
+            startDate: self::chronosDate('2025-01-10'),
+            startTime: self::chronosTime('09:00'),
+            endTimeOrDuration: 'PT1H',
+            timezone: $this->tz
+        );
+
+        $occurrences = iterator_to_array(
+            ScheduleExpander::occurrencesInDateRange(
+                schedule: $schedule,
+                from: self::chronosDate('2025-01-10'),
+                to: self::chronosDate('2025-01-10'),
+                holidayProvider: $this->holidaysProvider
+            )
+        );
+
+        $this->assertCount(1, $occurrences);
+        $this->assertSame('2025-01-10 09:00', $occurrences[0]->start->format('Y-m-d H:i'));
+    }
+
     private static function chronosDate(string $date): ChronosDate
     {
         return new ChronosDate($date);
